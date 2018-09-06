@@ -8,5 +8,8 @@ This code has the following python-library dependencies:
         pip install dateutil
   3. numpy
         pip install numpy
- 
- 
+  4. sqlite
+        sudo apt install sqlite
+        ./configure --enable-loadable-sqlite-extensions && make && sudo make install 
+        
+        NOTE: The second command must be run in the installation directory of python.
