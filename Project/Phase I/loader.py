@@ -1,136 +1,202 @@
 # CSE 515
 # Project Phase 1
 #
-# TODO Do we need to load anything from desctext, descvis, gt?
-# TODO Create utilities to:
-#   1. Find user who took an image based on img id.
-#   2. Get 
+# TODO Do we need to load anything from descvis, gt?
 
 from lxml import etree
 import sys
 from os import listdir
 from os.path import isfile
 from dateutil.parser import parse
-import inspect
 from cv2 import cv2
-import multiprocessing
-from queue import Queue
-from copyreg import pickle
+import threading
+from collections import Counter
+import math
 import time # for testing efficiency.
+from database import SQLDatabase
 
 ################################################################
-####                    GENERIC LOADER                       ####
+####                    GENERIC LOADER                      ####
 ################################################################
 
-class GenericLoader:
+class GenericReader():
 
     def __init__(self):
-        self.loaded = Queue(maxsize=0)
+        # self.loaded = Queue(maxsize=0)
+        pass
 
     ##
     # Method to load a file of this type.
     # NOTE: this should append to self.loaded.
-    def load_file(self, file):
+    def load_file(self, file, database):
         raise NotImplementedError
     
+
+    ##
+    #
+    def load_files(self, files, database):
+        for file in files:
+            self.load_file(file, database)
+
+
     ##
     # Method to load a folder of files.
-    def load_folder(self, folder):
+    def __load_folder_worker__(self, folder, database, num_threads=1):
 
         items = list()
         if isfile(folder):
             return items
         
-        files = [file for file in listdir(folder) if isfile(folder + '/' + file)]
+        #for file in listdir(folder):
+        #    items.append(self.load_file(folder + '/' + file))
 
-        num_cpus = multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(num_cpus)
-        pool.map(self.load_file, files)
+        files = self.__get_files__(folder)
+        chunk_size = math.ceil(len(files) / num_threads)
 
-        return self.loaded
+        threads = list()
+        for i in range(0, len(files), chunk_size):
+            subset = files[i:i + chunk_size]
+            this_thread = threading.Thread(target=self.load_files, args=(subset,))
+            this_thread.start()
+            print("Beginning Thread " + str(this_thread.getName()))
+            threads.append(this_thread)
+        # pool = multiprocessing.Pool(num_cpus)
+        # pool.map(self.load_files, files)
 
-        # for file in listdir(folder):
-        #     item = self.load_file(folder + "/" + file)
-        #     if not item is None:
-        #         items.append(item)
-        
-        # return items
+        return threads
     
+
+    ##
+    # 
+    def load_folder(self, folder, database, num_threads):
+
+        # If we are set to spawn no threads, simply run everything through this thread.
+        if num_threads is 0:
+            self.load_files(self.__get_files__(folder), database)
+
+        else:
+            threads = self.__load_folder_worker__(folder, database, num_threads)
+            for thread in threads:
+                thread.join()
+    
+
     ##
     # Method to load a folder of folder.
-    def load_directory(self, directory):
-        image_map = {}
+    def load_directory(self, directory, database, threads_per_folder):
         for folder in listdir(directory):
-            image_map[folder] = self.load_folder(directory + '/' + folder)
-        return image_map
+            self.load_folder(directory + '/' + folder, database, threads_per_folder)
+
+    ##
+    # 
+    def __get_files__(self, folder):
+        return [folder + '/' + file for file in listdir(folder) if isfile(folder + '/' + file)]
+
+
+################################################################
+####              TEXT DESCRIPTION LOADER                   ####
+################################################################
+
+# NOTE -  The textual descriptions can be found in the folder Dataset/desctext
+#   Each of them are structured as followed.
+#   ID  "Text Term That Appeared" TF IDF TF-IDF
+#   The ID will be the id of an image, user, or other depending on the
+#       file.
+
+class DescriptionReader(GenericReader):
+
+    ##
+    # 
+    def load_file(self, file, database):
+
+        if not isfile(file):
+            raise FileNotFoundError('Could not parse description file ' + str(file) + ' as it doesn\'t exist')
+        
+        with open(file) as f:
+            for line in f:
+                # Tokenize
+                tokens = line.split(' ')
+                tokens.remove('\n')
+                # Find out how many tokens make up the ID
+                for i, token in enumerate(tokens):
+                    if '"' in token:
+                        # This is our first term. Return our index to
+                        #   get the id.
+                        index = i
+                        break
+                id = ' '.join(tokens[0: index])
+                for i in range(index,len(tokens), 4):
+                    term, tf, idf, tfidf = tokens[i : i+4]
+                    self.add_to_db(id, term, tf, idf, tfidf, database)
+
+    ##
+    #
+    def add_to_db(self, id, term, tf, idf, tfidf, database):
+        raise NotImplementedError
+
+
+class PhotoDescriptionReader(DescriptionReader):
+    def add_to_db(self, id, term, tf, idf, tfidf, database):
+        database.add_photo_desc(id, term, tf, idf, tfidf)
+
+class UserDescriptionReader(DescriptionReader):
+    def add_to_db(self, id, term, tf, idf, tfidf, database):
+        database.add_user_desc(id, term, tf, idf, tfidf)
+
+class LocationDescriptionReader(DescriptionReader):
+    def add_to_db(self, id, term, tf, idf, tfidf, database):
+        # Get the location id by the name
+        location = database.get_loc_id(id)
+        if not location:
+            raise NameError('There was no location in the database with name ' + str(id) + ', type: ' + str(type(id)))
+        database.add_loc_desc(location[0][0], term, tf, idf, tfidf)
+
 
 
 ################################################################
 ####                    LOCATION DATA                       ####
 ################################################################
-
-class LocationEntry:
-
-    def __init__(self, id = None, title = None, name=None, latitude = None, longitude = None, wiki = None):
-        self.id = int(id)
-        self.title = title
-        self.name = name
-        self.latitude = float(latitude)
-        self.longitude = float(longitude)
-        self.wiki = wiki
-
 ##
 # NOTE: There are 593 user files, each with a ton of images. This loader
 #   takes a while to run.
-class LocationReader(GenericLoader):
+class LocationReader(GenericReader):
 
     ##
     #
-    def load_file(self, file):
-        self.load_files(file, 'poiNameCorrespondences.txt')
+    def load_file(self, file, database):
+        self.load_files(file, 'poiNameCorrespondences.txt', database)
 
     ##
     # Loads the location file using location and name_correlation files.
-    def load_files(self, name_file, corr_file):
-        name_corr = self.load_name_corr(corr_file)
-        locations = self.load_locations(name_file, name_corr)
-        self.loaded.put(locations)
+    def load_files(self, name_file, corr_file, database):
+        name_corr = self.load_name_corr(corr_file, database)
+        self.load_locations(name_file, name_corr, database)
 
     ##
     # Create dictionary of title > Location
-    def load_locations(self, file, name_correlation):
+    def load_locations(self, file, name_correlation, database):
 
         if not isfile(file):
             raise FileNotFoundError('The location data could not be loaded as the provided file was invalid: ' + str(file))
         if not type(name_correlation) is dict:
             raise TypeError('Name correlation was not of the appropriate dictionary type: ' + str(type(name_correlation)))
 
-        try:
-            tree = etree.parse(file)
-        except IOError as e:
-            print ("File " + file + " not found. " +str(e))
+        tree = etree.parse(file)
 
         root = tree.getroot()
-        return_val = {}
 
-        for child in root:
+        for location in root:
             # Load all data from branch.
-            child_id = child.find('number').text
-            title = child.find('title').text
-            latitude = child.find('latitude').text
-            longitude = child.find('longitude').text
-            wiki = child.find('wiki').text
-            location_name = name_correlation[title]
-            # Create dictionary entry.
-            dict_entry = LocationEntry(id=child_id, name=location_name, title=title, latitude=latitude, longitude=longitude, wiki=wiki)
-            # create mapping.
-            return_val[title] = dict_entry
-        
-        return return_val
+            locationid = location.find('number').text
+            title = location.find('title').text
+            name = name_correlation[title]
+            latitude = location.find('latitude').text
+            longitude = location.find('longitude').text
+            wiki = location.find('wiki').text
+            database.add_location(locationid, title, name, latitude, longitude, wiki)
 
     ##
     # Load title > name correlations
-    def load_name_corr(self, file):
+    def load_name_corr(self, file, database):
 
         if not isfile(file):
             raise FileNotFoundError('The name correlation dictionary could not be created as the provided parameter was not a vaild file: ' + str(file))
@@ -143,109 +209,75 @@ class LocationReader(GenericLoader):
         
         return name_correlation
 
-
-class UserCred():
-
-    def __init__(self, visualScore=None, faceProportion=None, tagSpecificity=None,
-                locationSimilarity=None, photoCount=None, uniqueTags=None,
-                uploadFrequency=None, bulkProportion=None):
-        self.visualScore = visualScore
-        self.faceProportion = faceProportion
-        self.tagSpecificity = tagSpecificity
-        self.locationSimilarity = locationSimilarity
-        self.photoCount = photoCount
-        self.uniqueTags = uniqueTags
-        self.uploadFrequency = uploadFrequency
-        self.bulkProportion = bulkProportion
-
 ################################################################
 ####                     USER LOADER                        ####
 ################################################################
 
-class Photo():
+class UserReader(GenericReader):
 
-    def __init__(self, date_taken=None, id=None, tags=None, title=None, url_b=None, userid=None, views=None):
-        self.date_taken = date_taken
-        self.id = id
-        self.tags = tags
-        self.title = title
-        self.url_b = url_b
-        self.userid = userid
-        self.views = views
-
-class User():
-
-    def __init__(self, credibility=None, photos=None, id=None):
-        self.credibility = credibility
-        self.photos = photos
-        self.id = id
-
-
-class UserLoader(GenericLoader):
 
     ##
     # load user from file.
-    def load_file(self, file):
+    def load_file(self, file, database):
         
         if not isfile(file):
             raise FileNotFoundError('File from which to load user could not be found: ' + str(file))
         
-        try:
-            tree = etree.parse(file)
-        except IOError as e:
-            print("Could not parse user file " + str(file) + "; " + str(e))
-            return None
+        tree = etree.parse(file)
         
         # get the two main sections of the xml file
         root = tree.getroot()
-        user_id = root.get('user')
+        userid = root.get('user')
         credibility = root.find('credibilityDescriptors')
         photos = root.find('photos')
 
         # load in separate function
-        cred = self.__load_credibility__(credibility)
-        pics = self.__load_photos__(photos)
-
-        # return User(credibility=cred, photos=pics, id=user_id)
-        self.loaded.put(User(credibility=cred, photos=pics, id=user_id))
+        self.__load_credibility__(credibility, file, userid, database)
+        self.__load_photos__(photos, file, database)
 
     ## 
     # Load information from the credibility section of the user
     #   xml.
-    def __load_credibility__(self, credibility_root):
+    def __load_credibility__(self, credibility_root, file, userid, database):
         
-        children = credibility_root.iter()
+        visualScore = self.__get_credibility_value__(credibility_root, 'visualScore')
+        faceProportion = self.__get_credibility_value__(credibility_root, 'faceProportion')
+        tagSpecificity = self.__get_credibility_value__(credibility_root, 'tagSpecificity')
+        locationSimilarity = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
+        photoCount = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
+        uniqueTags = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
+        uploadFrequency = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
+        bulkProportion = self.__get_credibility_value__(credibility_root, 'bulkProportion')
         
-        for child in children:
-            visualScore = float(child.get('visualScore').text)
-            faceProportion = float(child.get('faceProportion').text)
-            tagSpecificity = float(child.get('tagSpecificity').text)
-            locationSimilarity = float(child.get('locationSimilarity').text)
-            photoCount = int(child.get('photoCount').text)
-            uniqueTags = float(child.get('uniqueTags').text)
-            uploadFrequency = float(child.get('uploadFrequency').text)
-            bulkProportion = float(child.get('bulkProportion').text)
-        
-        return UserCred(visualScore, faceProportion, tagSpecificity, locationSimilarity,
-                        photoCount, uniqueTags, uploadFrequency, bulkProportion)
+        database.add_user(userid, visualScore, faceProportion, tagSpecificity, locationSimilarity,
+                            photoCount, uniqueTags, uploadFrequency, bulkProportion)
+
+
+    def __get_credibility_value__(self, credibility_root, field):
+
+        try:
+            returnval = float(credibility_root.find(field).text)
+        except Exception as e:
+            print("An exception occured loading value " + str(field) + " as float/real.")
+            returnval = None
+        return returnval
 
     ##
     # Load the photos from the user.
-    def __load_photos__(self, photos_root):
+    def __load_photos__(self, photos_root, file, database):
 
-        photos = []
-        for photo in photos_root.iterfind('photo'):
-            try:
-                photos.append(Photo(date_taken=parse(photo.get('date_taken')), 
-                            id=int(photo.get('id')),
-                            tags=photo.get('tags').split(' '),
-                            title=photo.get('title'),
-                            url_b=photo.get('url_b'),
-                            userid=photo.get('userid'),
-                            views=int(photo.get('views'))))
-            except Exception as e:
-                print('An exception occured when appending photo ' + photo.get('title') + ': ' + str(e))
-        return photos
+        print("Loading " + str(len(photos_root.getchildren())) + " photos...")
+        for photo in photos_root:
+            id=photo.get('id')
+            userid=photo.get('userid')
+            date_taken=photo.get('date_taken') 
+            views=int(photo.get('views'))
+            title=photo.get('title')
+            url_b=photo.get('url_b')
+            tags=photo.get('tags').split(' ')
+            database.add_photo(id, userid, date_taken,views, title, url_b)
+            for tag in tags:
+                database.add_tag(id, tag)
 
 
 ################################################################
@@ -253,36 +285,104 @@ class UserLoader(GenericLoader):
 ################################################################
 
 
-class ImageLoader(GenericLoader):
+class ImageReader(GenericReader):
 
     ##
     # Load the image into a numpy array.
     def load_file(self, file):
         image = cv2.imread(file)
-        self.loaded.put(image)
 
 
 ################################################################
 ####                    Load All Data                       ####
 ################################################################
+class Loader():
+        
+    def load_timed(self, folder, num_threads=0):
+        start_time = time.time()
+        self.load_database(folder, num_threads)
+        return start_time - time.time()
 
-def load_data_timed(folder):
-    start_time = time.time()
-    location_map, images, users = load_data(folder)
-    elapsed = start_time - time.time()
-    print("Loading images, location, and users took " + str(elapsed) + " time.")
-    return location_map, images, users
+    ##
+    #
+    def load_database(self, folder, database, num_threads=0):
+        UserReader().load_folder(folder + '/desccred', database, num_threads)
+        database.commit()
+        print("Users and Photos Loaded...")
+        LocationReader().load_files(folder + '/devset_topics.xml',
+                folder + '/poiNameCorrespondences.txt', database)
+        database.commit()
+        print("Locations Loaded...")
+        LocationDescriptionReader().load_file(folder + '/desctxt/devset_textTermsPerPOI.txt', database)
+        database.commit()
+        print("Location Descriptions Loaded...")
+        PhotoDescriptionReader().load_file(folder + '/desctxt/devset_textTermsPerImage.txt', database)
+        database.commit()
+        print("Photo Descriptions Loaded...")
+        UserDescriptionReader().load_file(folder + '/desctxt/devset_textTermsPerUser.txt', database)
+        database.commit()
+        print("User Descriptions Loaded...")
+        return database
+        
+
+    ##
+    # Construct 
+    def make_database(self, filepath, num_threads=0):
+        database = SQLDatabase(filepath)
+        database.make_tables()
+        return database
+
+    ##
+    # 
+    def test_database(self, database):
+        # Location Validation
+        locations = database.get_locations()
+        print("Found " + str(len(locations)) + " locations.")
+        for i, location in enumerate(locations):
+            location = location[0]
+            loc_desc = database.get_loc_desc(location)
+            print(str(i) + ": Location " + str(location) + "\t" + str(loc_desc))
+        # User Validation
+        users = database.get_user_list()
+        print("Found " + str(len(users)) + " users...")
+        for i, user in enumerate(users):
+            user = user[0]
+            user_desc = database.get_user_desc(user)
+            print(str(i) + ": User " + str(user) + "\t" + str(user_desc))
+            user_photos = database.get_user_photos(user)
+            print("Found " + str(len(user_photos)) + " for User " + user)
+            for j, photo in enumerate(user_photos):
+                photo = photo[0]
+                photo_desc = database.get_photo_desc(photo)
+                if photo_desc:
+                    print("\t" + str(j) + ": Photo " + str(photo) + "\t" + str(photo_desc))
 
 
-##
-# Takes about 25 seconds to load location_map and images
-# Takes [a long time]
-def load_data(folder):
-    # Load locations
-    loc_reader = LocationReader()
-    loc_reader.load_files(folder + '/devset_topics.xml',
-               folder + '/poiNameCorrespondences.txt')
-    location_map = loc_reader.loaded
-    users = UserLoader().load_folder(folder + '/desccred')
-    images = ImageLoader().load_directory(folder + '/img') # About 4GB when loaded. VERY large.
-    return location_map, images, users
+    ##
+    # Get the most efficient number of threads to use for this computer.
+    # TODO Should this method be removed?
+    def simple_climb(self, folder, start = 7):
+
+        best_time = self.load_timed(folder, start)
+        print("Initial Time Set: " + str(best_time) + " for " + str(start) + " threads.")
+        valid_ops = [lambda a: a +1, lambda a: a-1]
+
+        this_op = valid_ops[0]
+        current = start
+        best_threads = start
+        tried_threads = Counter()
+        # While the most common state is less than three.
+        while tried_threads.most_common(1)[1] <= 3:
+            current = this_op(current)
+            new_time = self.load_timed(folder, current)
+
+            if new_time < best_time:
+                best_time = new_time
+                best_threads = start
+                print("New Best Time Set: " + str(best_time) + " for " + str(best_threads) + " threads.")
+            elif new_time > best_time:
+                this_op = [op for op in valid_ops if not op is this_op][0]
+            
+            tried_threads.update(current)
+
+        return best_threads, best_time
