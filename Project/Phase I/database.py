@@ -6,11 +6,12 @@ class SQLDatabase():
     def __init__(self, database):
         self.conn = sqlite3.connect(database)
         self.tables = ['users', 'user_photos', 'user_descriptions', 'photos',
-                        'tags', 'photo_descriptions', 'locations', 'loc_descriptions']
+                        'tags', 'photo_descriptions', 'visual_descriptors',
+                        'photo_locations', 'locations', 'loc_descriptions']
     
     ##
     # NOTE - only run on new databases, else you will get errors
-    def make_tables(self):
+    def make_tables(self, visual_models = ['CM', 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']):
         # USER TABLES'
         self.conn.execute("CREATE TABLE IF NOT EXISTS users ( \
                             userid string, \
@@ -31,7 +32,7 @@ class SQLDatabase():
                             userid string,\
                             term string,\
                             tf real,\
-                            idf real,\
+                            df real,\
                             tfidf real\
                         )")
         # PHOTO TABLES
@@ -48,11 +49,23 @@ class SQLDatabase():
                             tag string\
                         )")
         self.conn.execute("CREATE TABLE IF NOT EXISTS photo_descriptions (\
-                            photoid string,\
+                            photoid int,\
                             term string,\
                             tf real,\
-                            idf real,\
+                            df real,\
                             tfidf real\
+                        )")
+            
+        # Made one table per model - attempted speedup
+        for model in visual_models:
+            self.conn.execute("CREATE TABLE IF NOT EXISTS visual_descriptors_" + model + " (\
+                                photoid int,\
+                                visual_desc real \
+                            )")
+        
+        self.conn.execute("CREATE TABLE IF NOT EXISTS photo_locations (\
+                            photoid int,\
+                            locationid int\
                         )")
         # LOCATION TABLES
         self.conn.execute("CREATE TABLE IF NOT EXISTS locations (\
@@ -67,7 +80,7 @@ class SQLDatabase():
                             locationid int,\
                             term string,\
                             tf real,\
-                            idf real,\
+                            df real,\
                             tfidf real\
                         )")
 
@@ -111,20 +124,20 @@ class SQLDatabase():
 
     ##
     # 
-    def add_photo_desc(self, id, term, tf, idf, tfidf):
+    def add_photo_desc(self, id, term, tf, df, tfidf):
 
-        self.add_request('photo_descriptions', photoid=id, term=term, tf=tf, idf=idf, tfidf=tfidf)
-
-    ##
-    #
-    def add_user_desc(self, id, term, tf, idf, tfidf):
-
-        self.add_request('user_descriptions', userid=id, term=term, tf=tf, idf=idf, tfidf=tfidf)
+        self.add_request('photo_descriptions', photoid=id, term=term, tf=tf, df=df, tfidf=tfidf)
 
     ##
     #
-    def add_loc_desc(self, id, term, tf, idf, tfidf):
-        self.add_request('loc_descriptions', locationid=id, term=term, tf=tf, idf=idf, tfidf=tfidf)
+    def add_user_desc(self, id, term, tf, df, tfidf):
+
+        self.add_request('user_descriptions', userid=id, term=term, tf=tf, df=df, tfidf=tfidf)
+
+    ##
+    #
+    def add_loc_desc(self, id, term, tf, df, tfidf):
+        self.add_request('loc_descriptions', locationid=id, term=term, tf=tf, df=df, tfidf=tfidf)
     
     ##
     #
@@ -149,6 +162,19 @@ class SQLDatabase():
         self.add_request('photos', photoid=photoid, userid=userid, date_taken=date_taken, views=views,
                         title=title, url_b=url_b)
         self.add_request('user_photos', userid=userid, photoid=photoid)
+    
+    ##
+    # 
+    def add_visual_descriptor(self, photoid, value, model):
+
+        self.add_request('visual_descriptors_' + model, photoid=photoid, visual_desc=value)
+        
+    ##
+    #
+    def add_photo_location(self, photoid, locationid):
+
+        self.add_request('photo_locations', photoid=photoid, locationid=locationid)
+
 
     ##################################################################
     ###                      Retrieving Data                       ###
@@ -177,10 +203,16 @@ class SQLDatabase():
         req = self.conn.execute(request)
         return req.fetchall()
 
+    # Locations ###############################################
+
+    def get_location_titles(self):
+        
+        return self.get_request('locations', cols=['title'])
 
     def get_location_ids(self):
         
-        return self.get_request('locations', cols=['locationid'])
+        idlist =  self.get_request('locations', cols=['locationid'])
+        return [anid[0] for anid in idlist]
 
     def get_location(self, locationid):
 
@@ -189,6 +221,11 @@ class SQLDatabase():
     def get_location_by_name(self, name):
 
         return self.get_request('locations', name=name)
+    
+    def get_location_by_title(self, title):
+
+        val = self.get_request('locations', title=title)
+        return val[0]
 
     def get_loc_id(self, name):
 
@@ -202,7 +239,7 @@ class SQLDatabase():
 
         return self.get_request('loc_descriptions', locationid=locationid)
 
-    ######################################
+    # Users #####################################
 
     def get_user(self, userid):
 
@@ -210,7 +247,8 @@ class SQLDatabase():
 
     def get_user_ids(self):
 
-        return self.get_request('users', cols=['userid'])
+        idlist = self.get_request('users', cols=['userid'])
+        return [an_id[0] for an_id in idlist]
 
     def get_user_photos(self, userid):
 
@@ -224,15 +262,25 @@ class SQLDatabase():
 
         return self.get_request('user_descriptions', userid=userid)
 
-    ######################################
+    # Photos #####################################
 
     def get_photo(self, photoid):
 
         return self.get_request('photos', photoid=photoid)
     
+    def get_photo_location(self, photoid):
+
+        return self.get_request('photo_locations', cols=['locationid'], photoid=photoid)
+    
+    def get_photos_at_location(self, locationid):
+
+        idlist = self.get_request('photo_locations', cols=['photoid'], locationid=locationid)
+        return [an_id[0] for an_id in idlist]
+
     def get_photo_ids(self):
 
-        return self.get_request('photos', cols=['photoid'])
+        idlist = self.get_request('photos', cols=['photoid'])
+        return [an_id[0] for an_id in idlist]
 
     def get_photo_terms(self, photoid):
         
@@ -242,13 +290,19 @@ class SQLDatabase():
 
         return self.get_request('photo_descriptions', photoid=photoid)
     
+    def get_photo_visual_desc(self, photoid, model):
+
+        desc = self.get_request('visual_descriptors_' + model, cols=['visual_desc'], photoid=photoid)
+        return [d[0] for d in desc]
+
+
     #################################################################
     ###                   Structural Gets                        ####
     #################################################################
 
     def get_cols(self, table):
-
-        return self.conn.execute("SELECT * FROM " + table + ";")
+        cols = self.conn.execute("SELECT * FROM " + table + ";")
+        return [col[0] for col in cols.description]
 
     def get_photo_cols(self):
         return self.get_cols('photos')

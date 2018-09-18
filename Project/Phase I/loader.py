@@ -1,7 +1,5 @@
 # CSE 515
 # Project Phase 1
-#
-# TODO Do we need to load anything from descvis, gt?
 
 from lxml import etree
 import sys
@@ -9,11 +7,34 @@ from os import listdir
 from os.path import isfile
 from dateutil.parser import parse
 from cv2 import cv2
+import csv
 import threading
 from collections import Counter
 import math
 import time # for testing efficiency.
 from database import SQLDatabase
+
+###############################################################
+###                 LOGGER                                  ###
+###############################################################
+
+class Logger():
+    def __init__(self):
+        self.logs = {}
+    
+    def add_log(self, file, msg):
+        if not file in self.logs.keys():
+            self.logs[file] = []
+        self.logs[file].append(msg)
+    
+    def to_file(self):
+        with open('error_log', 'w+') as f:
+            for key, value in self.logs.items():
+                f.write("Errors in " + key)
+                for msg in value:
+                    f.write("\t" + msg)
+
+
 
 ################################################################
 ####                    GENERIC LOADER                      ####
@@ -46,9 +67,6 @@ class GenericReader():
         items = list()
         if isfile(folder):
             return items
-        
-        #for file in listdir(folder):
-        #    items.append(self.load_file(folder + '/' + file))
 
         files = self.__get_files__(folder)
         chunk_size = math.ceil(len(files) / num_threads)
@@ -60,8 +78,6 @@ class GenericReader():
             this_thread.start()
             print("Beginning Thread " + str(this_thread.getName()))
             threads.append(this_thread)
-        # pool = multiprocessing.Pool(num_cpus)
-        # pool.map(self.load_files, files)
 
         return threads
     
@@ -104,6 +120,9 @@ class GenericReader():
 
 class DescriptionReader(GenericReader):
 
+    def __init__(self):
+        self.seen = []
+
     ##
     # 
     def load_file(self, file, database):
@@ -126,7 +145,8 @@ class DescriptionReader(GenericReader):
                 id = ' '.join(tokens[0: index])
                 for i in range(index,len(tokens), 4):
                     term, tf, idf, tfidf = tokens[i : i+4]
-                    self.add_to_db(id, term, tf, idf, tfidf, database)
+                    term = term.replace('\"', '')
+                    self.add_to_db(id, term, float(tf), float(idf), float(tfidf), database)
 
     ##
     #
@@ -135,12 +155,21 @@ class DescriptionReader(GenericReader):
 
 
 class PhotoDescriptionReader(DescriptionReader):
-    def add_to_db(self, id, term, tf, idf, tfidf, database):
-        database.add_photo_desc(id, term, tf, idf, tfidf)
+
+    def add_to_db(self, an_id, term, tf, idf, tfidf, database):
+        # as test w/ smaller db
+        an_id = int(an_id)
+        if not an_id in self.seen:
+            database.add_photo(an_id, None, None, None, None, None)
+            self.seen.append(an_id)
+        database.add_photo_desc(an_id, term, tf, idf, tfidf)
 
 class UserDescriptionReader(DescriptionReader):
-    def add_to_db(self, id, term, tf, idf, tfidf, database):
-        database.add_user_desc(id, term, tf, idf, tfidf)
+    def add_to_db(self, an_id, term, tf, idf, tfidf, database):
+        if not an_id in self.seen:
+            database.add_user(an_id, None, None, None, None, None, None, None, None)
+            self.seen.append(an_id)
+        database.add_user_desc(an_id, term, tf, idf, tfidf)
 
 class LocationDescriptionReader(DescriptionReader):
     def add_to_db(self, id, term, tf, idf, tfidf, database):
@@ -248,7 +277,7 @@ class UserReader(GenericReader):
         uniqueTags = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
         uploadFrequency = self.__get_credibility_value__(credibility_root, 'locationSimilarity')
         bulkProportion = self.__get_credibility_value__(credibility_root, 'bulkProportion')
-        
+
         database.add_user(userid, visualScore, faceProportion, tagSpecificity, locationSimilarity,
                             photoCount, uniqueTags, uploadFrequency, bulkProportion)
 
@@ -256,10 +285,11 @@ class UserReader(GenericReader):
     def __get_credibility_value__(self, credibility_root, field):
 
         try:
-            returnval = float(credibility_root.find(field).text)
+            returnval = credibility_root.find(field).text
+            returnval = float(returnval)
         except Exception as e:
-            print("An exception occured loading value " + str(field) + " as float/real.")
             returnval = None
+            #raise IOError("An exception occured loading value " + str(field) + " as float/real.")
         return returnval
 
     ##
@@ -283,14 +313,37 @@ class UserReader(GenericReader):
 ################################################################
 ####                     IMAGE LOADER                       ####
 ################################################################
-
-
-class ImageReader(GenericReader):
+# TODO - Update this to read into database.
+# def get_photo_visual_desc(self, photoid, model):
+# def add_visual_descriptor(self, photoid, locationid, value, model):
+class VisualDescriptionReader(GenericReader):
 
     ##
     # Load the image into a numpy array.
-    def load_file(self, file):
-        image = cv2.imread(file)
+    def load_model(self, folder, locationid, title, model, database):
+        file = self.get_file_name(title, model)
+        with open(folder + '/' + file, 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            for row in reader:
+                photoid = row[0]
+                database.add_photo_location(photoid, locationid)
+                visual_descriptors = row[1:]
+                for visual_descriptor in visual_descriptors:
+                    database.add_visual_descriptor(photoid, visual_descriptor, model)
+
+
+    def get_file_name(self, location_title, model):
+        return location_title + " " + model + ".csv"
+
+
+    def load_csvs(self, folder, models, database):
+        # get all location titles
+        titles = [title[0] for title in database.get_location_titles()]
+        for title in titles:
+            location = database.get_location_by_title(title)
+            locationid = location[0]
+            for model in models:
+                self.load_model(folder, locationid, title, model, database)
 
 
 ################################################################
@@ -306,9 +359,9 @@ class Loader():
     ##
     #
     def load_database(self, folder, database, num_threads=0):
-        UserReader().load_folder(folder + '/desccred', database, num_threads)
-        database.commit()
-        print("Users and Photos Loaded...")
+        # UserReader().load_folder(folder + '/desccred', database, num_threads)
+        # database.commit()
+        # print("Users and Photos Loaded...")
         LocationReader().load_files(folder + '/devset_topics.xml',
                 folder + '/poiNameCorrespondences.txt', database)
         database.commit()
@@ -322,6 +375,10 @@ class Loader():
         UserDescriptionReader().load_file(folder + '/desctxt/devset_textTermsPerUser.txt', database)
         database.commit()
         print("User Descriptions Loaded...")
+        models = ['CM', 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
+        VisualDescriptionReader().load_csvs(folder + '/descvis/img/', models, database)
+        database.commit()
+        print("Visual Descriptors Loaded...")
         return database
         
 

@@ -1,6 +1,3 @@
-# Questions:
-#   1. What does Textual Descriptor refer to? For image is it tags?
-#       For users is it the tags of their images?
 """
 Task 1: Implement a program which, given a user ID, a model
 (TF, DF, TF-IDF), and value “k”, returns the most similar
