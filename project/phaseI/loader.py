@@ -1,10 +1,8 @@
 from lxml import etree
 from os import listdir, path
 from os.path import isfile
-import pandas as pd
-from database import Database
-from collections import defaultdict
 from util import timed
+from database import Database
 
 ################################################################
 ####                    GENERIC LOADER                      ####

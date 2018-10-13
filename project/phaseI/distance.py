@@ -1,4 +1,4 @@
-from util import timed
+from scipy.spatial.distance import cdist
 
 ##
 # This distance class uses the dictionary keys (the features) to compare two vectors. This
@@ -21,18 +21,15 @@ class Distance():
         pass
 
 
+    ############################################################################
+    ## THESE ARE ALL DISTANCE MEASURES DONE USING DIFFERENT STRATEGIES TO COMPARE
+    ## TIME DIFFERENCES.
+
+
     @staticmethod
-    def l_p_distance_alt(p, vector, table, positional=False):
+    def l_p_distance(p, vector, table, positional=False):
 
         distances = table.sub(vector, axis='columns').abs().pow(p).sum(1).pow(1/p)
-        return distances    
-    
-    @staticmethod
-    def l_p_distance(p, vector, other, positional=False):
-
-        # Splice table to just the columns in vector.
-        distances = vector.sub(other).abs().pow(p).sum(1)
-        distances = distances ** (1/p)
         return distances
 
 ##

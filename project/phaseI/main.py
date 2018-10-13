@@ -8,9 +8,7 @@
 #   3. Where does data come from for 4, 5?
 #           NOTE: P5 is aggregating all 10 models of P4.
 
-import sys
 from os.path import isfile, abspath, isdir
-from functools import wraps
 from loader import Loader
 from database import Database
 from vectorize import Vectorizer
@@ -93,11 +91,13 @@ class Interface():
         
         folder = abspath(args[0])
 
-        # for debug
-        # self.database = self.loader.make_database(filename)
-        # self.loader.load_database('/home/crosleyzack/Documents/cse515/repo/Project/Dataset', self.database)
-
         if not isdir(folder):
+            print("[ERROR] The provided path was not a folder, and therefore not a valid data directory.")
+            return
+        
+        self.database = self.loader.make_database(folder)
+
+        """if not isdir(folder):
             print("[WARNING] The folder provided does not exist.")
             user_input = input("Would you like to create and load it? (y/n):$ ")
             if user_input.lower()[0] == 'n':
@@ -116,7 +116,7 @@ class Interface():
             else:
                 print("[ERROR] Please enter a valid input.")
         else:
-            self.database = self.loader.load_database(folder)
+            self.database = self.loader.load_database(folder)"""
 
     ##
     # retrieve an item from the database.

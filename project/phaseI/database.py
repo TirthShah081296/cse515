@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from os import listdir
 from os.path import basename, join, isfile, splitext
-import tables
+
 class Database():
 
     ##
@@ -62,6 +62,7 @@ class Database():
                     del(old_table)
 
                 b = pd.DataFrame.from_dict(data=table, orient='index', dtype='float')
+                b.sort_index(inplace=True)
                 #self.txt_descriptors[desc_type, model] = b.fillna(0, downcast='infer').to_sparse(fill_value=0)
                 self.txt_descriptors[desc_type, model] = b.to_sparse().fillna(0)
                 del(b) # - attempt at memory efficiency.
@@ -86,7 +87,8 @@ class Database():
             loc_title, model = get_info_from_file(filename)
             location = self.get_location_by_title(loc_title)
             locationid = location['id']
-            self.vis_descriptors[locationid, model] = pd.read_csv(file, names= ['photoid', '0', '1', '2', '3', '4', '5', '6', '7', '8'], dtype='float')
+            table = pd.read_csv(file, names= ['photoid', '0', '1', '2', '3', '4', '5', '6', '7', '8'], dtype='float')
+            self.vis_descriptors[locationid, model] = table.sort_index().to_sparse().fillna(0)
 
     ##################################################################
     ###                      Retrieving Data                       ###
@@ -130,15 +132,20 @@ class Database():
                 model value for that term.
         """
         table = self.get_txt_desc_table(atype, model)
-        vector = table.loc[an_id]
-        return vector
+        return table.loc[an_id]
+
     
     def get_txt_descriptor_cols(self, atype, model):
         return self.get_txt_desc_table(atype, model).cols
 
     # vis descriptors #####################################
 
+    def get_vis_table(self, locationid, model):
+        return self.vis_descriptors[locationid, model]
 
+    def get_vis_vector(self, locationid, model, an_id):
+        table = self.get_vis_table(locationid, model)
+        return table.loc[an_id]
 
     ##################################################################
     ###                             IO                             ###
