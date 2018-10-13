@@ -85,10 +85,9 @@ class DescriptionReader(GenericReader):
 
         if not isfile(file):
             raise OSError('Could not parse description file ' + str(file) + ' as it doesn\'t exist')
-
-        table = {'tf': {}, 'idf': {}, 'tfidf': {}}
-
+        
         # Strategy - create matrix representation with lists and then put into a new pandas dataframe.
+        table = {}
 
         with open(file) as f:
             for line in f:
@@ -110,16 +109,12 @@ class DescriptionReader(GenericReader):
                     # oh well, not possible. Just use as string
                     pass
 
-                table['tf'][an_id] = {}
-                table['idf'][an_id] = {}
-                table['tfidf'][an_id] = {}
+                table[an_id] = {}
 
                 for i in range(j,len(tokens), 4):
                     term, tf, idf, tfidf = tokens[i : i+4]
                     term = term.replace('\"', '')
-                    table['tf'][an_id][term] = float(tf)
-                    table['idf'][an_id][term] = float(idf)
-                    table['tfidf'][an_id][term] = float(tfidf)
+                    table[an_id][term] = 1
 
         return table
 

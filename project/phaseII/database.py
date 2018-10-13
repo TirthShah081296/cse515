@@ -47,27 +47,25 @@ class Database():
         # desc_type in [photo, user, poi];
         # table = dict where
         #   an_id -> (tf, idf, tfidf) -> terms -> values
-        for desc_type, models_n_tables in txt_descriptors.items():
+        for desc_type, table in txt_descriptors.items():
 
-            for model, table in models_n_tables.items():
+            if desc_type == 'poi':
+                old_table = dict(table)
+                table = {}
+                # we want to change the location names to the location ids
+                #rows = [ [self.get_location_by_name(row[0])['id']] + row[1:] for row in rows]
+                for poi_name in old_table.keys():
+                    table[self.get_location_by_name(poi_name)['id']] = old_table[poi_name]
+                # Manually delete old_table from memory - memory is maxed out otherwise
+                del(old_table)
 
-                if desc_type == 'poi':
-                    old_table = dict(table)
-                    table = {}
-                    # we want to change the location names to the location ids
-                    #rows = [ [self.get_location_by_name(row[0])['id']] + row[1:] for row in rows]
-                    for poi_name in old_table.keys():
-                        table[self.get_location_by_name(poi_name)['id']] = old_table[poi_name]
-                    # Manually delete old_table from memory - memory is maxed out otherwise
-                    del(old_table)
-
-                b = pd.DataFrame.from_dict(data=table, orient='index', dtype='float')
-                b.sort_index(inplace=True)
-                #self.txt_descriptors[desc_type, model] = b.fillna(0, downcast='infer').to_sparse(fill_value=0)
-                self.txt_descriptors[desc_type, model] = b.to_sparse().fillna(0)
-                del(b) # - attempt at memory efficiency.
-
+            b = pd.DataFrame.from_dict(data=table, orient='index', dtype='float')
+            b.sort_index(inplace=True)
+            #self.txt_descriptors[desc_type, model] = b.fillna(0, downcast='infer').to_sparse(fill_value=0)
+            self.txt_descriptors[desc_type] = b.to_sparse().fillna(0)
+            del(b) # - attempt at memory efficiency.
     
+
     ##
     # Stores visual descriptors data.
     #
@@ -121,22 +119,22 @@ class Database():
 
     # txt descriptors #####################################
 
-    def get_txt_desc_table(self, atype, model):
-        return self.txt_descriptors[atype, model]
+    def get_txt_desc_table(self, atype):
+        return self.txt_descriptors[atype]
 
 
-    def get_txt_vector(self, atype, an_id, model):
+    def get_txt_vector(self, atype, an_id):
         """
             returns a table with two cols:
                 terms for this id
-                model value for that term.
+                0 if term is present, 1 if not present.
         """
-        table = self.get_txt_desc_table(atype, model)
+        table = self.get_txt_desc_table(atype)
         return table.loc[an_id]
 
     
-    def get_txt_descriptor_cols(self, atype, model):
-        return self.get_txt_desc_table(atype, model).cols
+    def get_txt_descriptor_cols(self, atype):
+        return self.get_txt_desc_table(atype).cols
 
     # vis descriptors #####################################
 
