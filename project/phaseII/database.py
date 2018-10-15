@@ -2,39 +2,42 @@ import pandas as pd
 import os
 from os import listdir
 from os.path import basename, join, isfile, splitext
+from csv import reader
 
 class Database():
 
     ##
-    # TODO - Add datatable w/ rows <photoid, userid, locationid> where photoid is index.
-
-    """
-        Pandas cheat sheet
-            Retrieve or Set Values - dataframe.loc[(row keys), (column labels)]
-            Query - dataframe.loc[(dataframe['column'] == value) & (dataframe['col2'] == value2) & ...]
-    """
-
-    ##
     # Store the various pandas dataframes for local use.
     def __init__(self):
-        self.locations = {}
+        
         self.vis_descriptors = {}
         self.txt_descriptors = {}
-        self.photo_info = pd.DataFrame(columns=['userid', 'locationid'])
+        self.locations = None
+        self.vis_models = ['CM', 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
+        
+
 
     ##################################################################
     ###                         ADDING DATA                        ###
     ##################################################################
     
+
     ##
     # Stores a location pandas dataframe.
     #
     # Data is a dictionary to be loaded into a frame with organization:
     #   <'locationid', title', 'name', 'latitude', 'longitude', 'wiki'>
-    # in each row, with 30 rows for the thirty locations.
+    #   in each row, with 30 rows for the 30 locations. Index is the location
+    #   id, an integer from 1 to 30.
+    #
+    # NOTE This table isn't needed for any specific part of the assignment,
+    #   but is used for associating location names, location titles, and 
+    #   location ids.
     def add_locations(self, locations):
         self.locations = pd.DataFrame(data=locations, columns=['id', 'title', 'name', 'latitude', 'longitude', 'wiki'])
-    
+        print('Locations Loaded...')
+
+
     ##
     # Stores textual descriptors data.
     #
@@ -44,9 +47,7 @@ class Database():
     #
     # NOTE id is not the key, as id's will repeat. (each id has multiple terms)
     def add_txt_descriptors(self, txt_descriptors):
-        # desc_type in [photo, user, poi];
-        # table = dict where
-        #   an_id -> (tf, idf, tfidf) -> terms -> values
+
         for desc_type, table in txt_descriptors.items():
 
             if desc_type == 'poi':
@@ -61,9 +62,10 @@ class Database():
 
             b = pd.DataFrame.from_dict(data=table, orient='index', dtype='float')
             b.sort_index(inplace=True)
-            #self.txt_descriptors[desc_type, model] = b.fillna(0, downcast='infer').to_sparse(fill_value=0)
             self.txt_descriptors[desc_type] = b.to_sparse().fillna(0)
             del(b) # - attempt at memory efficiency.
+        
+        print("User Descriptions Loaded...")
     
 
     ##
@@ -85,23 +87,27 @@ class Database():
             loc_title, model = get_info_from_file(filename)
             location = self.get_location_by_title(loc_title)
             locationid = location['id']
-            table = pd.read_csv(file, names= ['photoid', '0', '1', '2', '3', '4', '5', '6', '7', '8'], dtype='float')
+            # get number of columns in CSV file.
+            with open(file, 'r') as f:
+                readr = reader(f)
+                ncol=len(next(readr))
+            # load into dataframe.
+            table = pd.read_csv(file, index_col=0, header=0, names=range(ncol-1), dtype='float')
             self.vis_descriptors[locationid, model] = table.sort_index().to_sparse().fillna(0)
+
+        print("Visual Descriptors Loaded...")
+
 
     ##################################################################
     ###                      Retrieving Data                       ###
     ##################################################################
 
-    def get_table_value(self, table, field, value):
 
-        filtered = table.loc[table[field] == value]
-        return filtered
-
-    
     # Locations ###############################################
-    #   <'locationid', title', 'name', 'latitude', 'longitude', 'wiki'>
-
         
+    def get_table_value(self, table, field, value):
+        return table.loc[table[field] == value]
+            
     def get_location_by_title(self, title):
         location = self.get_table_value(self.locations, 'title', title)
         return location.iloc[0]
@@ -113,9 +119,11 @@ class Database():
     def get_location(self, an_id):
         location = self.get_table_value(self.locations, 'id', an_id)
         return location.iloc[0]
-    
-    def get_location_cols(self):
-        return self.locations.columns
+
+    def get_location_ids(self):
+        return list(self.locations.loc[:,'id'])
+
+
 
     # txt descriptors #####################################
 
@@ -125,25 +133,76 @@ class Database():
 
     def get_txt_vector(self, atype, an_id):
         """
-            returns a table with two cols:
-                terms for this id
-                0 if term is present, 1 if not present.
+        returns a series with term index and integer indicating presence of term.
         """
         table = self.get_txt_desc_table(atype)
         return table.loc[an_id]
 
-    
-    def get_txt_descriptor_cols(self, atype):
-        return self.get_txt_desc_table(atype).cols
+
 
     # vis descriptors #####################################
 
-    def get_vis_table(self, locationid, model):
-        return self.vis_descriptors[locationid, model]
 
-    def get_vis_vector(self, locationid, model, an_id):
+    def get_vis_table(self, locationid=None, model=None):
+        # If given both a location and a model, get the table.
+        if locationid and model:
+            return self.vis_descriptors[locationid, model]
+
+        # If only given a model, combine all location tables for that
+        #   model by rows. (The photoids should all be unique with the)
+        #   same nine data columns.
+        elif model:
+            table = None
+            for loc in self.get_location_ids():
+                loc_table = self.get_vis_table(loc, model)
+                if table is None:
+                    table = loc_table
+                else:
+                    table = table.combine_first(loc_table)
+                del(loc_table) # Delete table for memory storage.
+            return table.sort_index().to_sparse().fillna(0)
+
+        # If only given the location, combine all tables will all models
+        #   for that location. Each table should have the same photos but
+        #   different data, so we append the columns from each table by index.
+        elif locationid:
+            table = None
+            for vis_model in self.vis_models:
+                model_table = self.get_vis_table(locationid, vis_model)
+                if table is None:
+                    table = model_table
+                else:
+                    table = table.merge(right=model_table, how='outer', left_index = True, right_index = True)
+                del(model_table)
+            return table.sort_index().to_sparse().fillna(0)
+
+        # If given neither, combine all tables into a single table. Each location
+        #   its own series of rows and each model its own series of 9 columns.
+        # NOTE - the resulting table will have 90 columns and thousands of rows.
+        else:
+            table = None
+            for loc in self.get_location_ids():
+                sub_table = self.get_vis_table(locationid=loc)
+                table.combine_first(sub_table)
+                del(sub_table)
+            return table.sort_index().to_sparse().fillna(0)
+
+
+    # Get vector corresponding to the photo id  based on the locationid and model.
+    #   If model is none, the tables will be combined to get a vector for 
+    #   every model.
+    #   If locationid is none, every location will be checked.
+    #
+    #   NOTE - checking with locationid and/or model as None will cause 
+    #       a table join and then discarding the table. It would be more
+    #       efficient to get the table and then get the vector yourself in
+    #       any condition which the table is needed as well.
+    def get_vis_vector(self, locationid, model, photoid):
         table = self.get_vis_table(locationid, model)
-        return table.loc[an_id]
+        return table.loc[photoid]
+
+
+
 
     ##################################################################
     ###                             IO                             ###
@@ -285,6 +344,7 @@ class Database():
             db.vis_descriptors[locationid, model] = pd.read_hdf(folder + '/vis.hdf', key=locationid + ' ' + model, mode='r')
 
         return db
+
 
 
     ##################################################################

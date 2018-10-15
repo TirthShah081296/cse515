@@ -1,6 +1,7 @@
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 from sklearn.decomposition import PCA
 from sklearn.decomposition import TruncatedSVD as SVD
+from util import timed
 
 
 class Decompose():
@@ -24,7 +25,7 @@ class Decompose():
         return out
     
     @staticmethod
-    def decompose(term_space, k, method, database):
+    def decompose_text(term_space, k, method, database):
         table = database.get_txt_desc_table(term_space)
         
         if method == 'pca':
@@ -36,3 +37,23 @@ class Decompose():
         
         returnval = f(table, k, database)
         return returnval
+    
+    @staticmethod
+    @timed
+    def decompose_vis(model, k, method, database):
+        table = database.get_vis_table(model=model)
+        raise NotImplementedError # TASK 3 IMPLEMENT
+    
+
+    @staticmethod
+    @timed
+    def decompose_loc_vis(model, k, method, locationid, database):
+        table = database.get_vis_table(model=model, locationid=locationid)
+        raise NotImplementedError # TASK 4 IMPLEMENT
+    
+
+    @staticmethod
+    @timed
+    def decompose_loc(k, method, locationid, database):
+        table = database.get_vis_table(locationid=locationid)
+        pass # TASK 5 IMPLEMENT

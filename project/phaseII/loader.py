@@ -3,6 +3,7 @@ from os import listdir, path
 from os.path import isfile
 from util import timed
 from database import Database
+from multiprocessing import Pool
 
 ################################################################
 ####                    GENERIC LOADER                      ####
@@ -19,7 +20,6 @@ class GenericReader():
     # NOTE: this should append to self.loaded.
     def load_file(self, file, index=None):
         raise NotImplementedError
-
 
     ##
     #
@@ -41,7 +41,6 @@ class GenericReader():
         files = self.__get_files__(folder)
         return self.load_files(files)
 
-
     ##
     # Method to load a folder of folder.
     def load_directory(self, directory):
@@ -51,7 +50,6 @@ class GenericReader():
             return_val.append(out)
         return return_val
     
-
     ##
     #
     def __get_files__(self, folder):
@@ -79,16 +77,12 @@ class DescriptionReader(GenericReader):
     def __init__(self):
         self.seen = []
 
-    ##
-    #
     def load_file(self, file, index):
-
         if not isfile(file):
             raise OSError('Could not parse description file ' + str(file) + ' as it doesn\'t exist')
         
         # Strategy - create matrix representation with lists and then put into a new pandas dataframe.
         table = {}
-
         with open(file) as f:
             for line in f:
                 # Tokenize
@@ -97,8 +91,7 @@ class DescriptionReader(GenericReader):
                 # Find out how many tokens make up the ID
                 for i, token in enumerate(tokens):
                     if '"' in token:
-                        # This is our first term. Return our index to
-                        #   get the id.
+                        # This is our first term. Return our index to get the id.
                         j = i
                         break
                 an_id = ' '.join(tokens[0: j])
@@ -106,7 +99,6 @@ class DescriptionReader(GenericReader):
                 try:
                     an_id = int(an_id)
                 except:
-                    # oh well, not possible. Just use as string
                     pass
 
                 table[an_id] = {}
@@ -114,7 +106,7 @@ class DescriptionReader(GenericReader):
                 for i in range(j,len(tokens), 4):
                     term, tf, idf, tfidf = tokens[i : i+4]
                     term = term.replace('\"', '')
-                    table[an_id][term] = 1
+                    table[an_id][term] = 1 # For this phase, we don't need to store the different values. Just whether the term is present.
 
         return table
 
@@ -129,8 +121,6 @@ class DescriptionReader(GenericReader):
 # Returns a dataframe with location information.
 class LocationReader(GenericReader): # GenericReader inheritance - don't forget it!
 
-    ##
-    #
     def load_file(self, file, index=None):
         self.load_files(file, 'poiNameCorrespondences.txt')
 
@@ -150,9 +140,7 @@ class LocationReader(GenericReader): # GenericReader inheritance - don't forget 
             raise TypeError('Name correlation was not of the appropriate dictionary type: ' + str(type(name_correlation)))
         
         tree = etree.parse(file)
-
         root = tree.getroot()
-        # location_dict = {}
         rows = list()
 
         for location in root:
@@ -163,17 +151,12 @@ class LocationReader(GenericReader): # GenericReader inheritance - don't forget 
             latitude = float(location.find('latitude').text)
             longitude = float(location.find('longitude').text)
             wiki = location.find('wiki').text
-            # location_dict[locationid] = [title, name, latitude, longitude, wiki]
             rows.append([locationid, title, name, latitude, longitude, wiki])
-
-        #database.add_location(location_dict)
-        #return location_dict
         return rows
 
-        ##
+    ##
     # Load title > name correlations
     def load_name_corr(self, file):
-
         if not isfile(file):
             raise OSError('The name correlation dictionary could not be created as the provided parameter was not a vaild file: ' + str(file))
 
@@ -189,12 +172,13 @@ class LocationReader(GenericReader): # GenericReader inheritance - don't forget 
 ################################################################
 ####                   VISUAL DESC LOADER                   ####
 ################################################################
+
 class VisualDescriptionReader(GenericReader):
 
-    ##
-    #
     def load_file(self, file):
         # Just accrue list of csv files to load into the database.
+        #   Little wasteful, but it allows the existing code to create
+        #   the list desired.
         return file
 
 
@@ -203,64 +187,28 @@ class VisualDescriptionReader(GenericReader):
 ################################################################
 class Loader():
 
-    ##
-    #
+    @staticmethod
     @timed
-    def make_database(self, folder):
+    def make_database(folder):
 
         db = Database()
-
-        # UserReader().load_folder(folder + '/desccred', database, num_threads)
-        # database.commit()
-        # print("Users and Photos Loaded...")
-        location_dict = LocationReader().load_files(folder + '/devset_topics.xml',
-                                    folder + '/poiNameCorrespondences.txt')
+        p = Pool(processes=3)
+        
+        # Load location data for associating the id's to the names.
+        loc_files = (folder + '/devset_topics.xml', folder + '/poiNameCorrespondences.txt')
+        location_dict = LocationReader().load_files(*loc_files)
         db.add_locations(location_dict)
-        print('Locations Loaded...')
-
-        descs = DescriptionReader().load_files([folder + '/desctxt/devset_textTermsPerPOI.txt',
-                                        folder + '/desctxt/devset_textTermsPerImage.txt',
-                                        folder + '/desctxt/devset_textTermsPerUser.txt'],
-                                        ['poi', 'photo', 'user'])
+        
+        # Load text description data.
+        text_files = [folder + '/desctxt/devset_textTermsPerPOI.txt',
+                      folder + '/desctxt/devset_textTermsPerImage.txt',
+                      folder + '/desctxt/devset_textTermsPerUser.txt']
+        types = ['poi', 'photo', 'user']
+        descs = DescriptionReader().load_files(text_files,types)
         db.add_txt_descriptors(descs)
-        # db.print_txt_desc()
-        print("User Descriptions Loaded...")
-
+        
+        # Load visual description data.
         files = VisualDescriptionReader().load_folder(folder + '/descvis/img')
         db.add_visual_descriptors(files)
-        # db.print_vis_desc()
-        print("Visual Descriptors Loaded...")
 
-        # TODO Create a database object encapsulating these and return it.
         return db
-
-
-    ##
-    # Construct
-    def load_database(self, folder):
-        db = Database.load_database(folder)
-        return db
-
-
-# For testing
-@timed
-def load_db():
-    src = '/home/crosleyzack/school/fall18/cse515/test_save/'
-    db = Database.load_database(src)
-    return db   
-@timed
-def make_db():
-    src = '/home/crosleyzack/school/fall18/cse515/repo/Project/Dataset'
-    db = Loader().make_database(src)
-    return db
-@timed
-def save_db(db):
-    dst = '/home/crosleyzack/school/fall18/cse515/test_save/'
-    db.save_database(dst)
-def get_vector(db):
-    db.get_txt_vector('user','10117222@N04', 'tf')
-
-#db = make_db()
-#save_db(db)
-#db = load_db()
-#print('Complete!')

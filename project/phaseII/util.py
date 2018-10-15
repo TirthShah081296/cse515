@@ -1,6 +1,14 @@
 from time import time
 from functools import wraps
 
+##
+# Add as decorator to any function to time how long the function takes to execute.
+#
+# Decorates must come after static declarations. For example:
+#   @staticmethod
+#   @timed
+#   def foo():
+#
 def timed(f):
     @wraps(f)
     def wrapper(*argv, **kwargs):
