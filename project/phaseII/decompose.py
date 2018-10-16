@@ -1,8 +1,9 @@
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 from sklearn.decomposition import PCA
 from sklearn.decomposition import TruncatedSVD as SVD
+from sklearn.preprocessing import StandardScaler
+from pandas import DataFrame
 from util import timed
-
 
 class Decompose():
 
@@ -12,18 +13,21 @@ class Decompose():
         out = matrix.fit_transform(table)
         return out
 
+
     @staticmethod
     def pca(table, k, database):
         matrix = PCA(n_components=k)
         out = matrix.fit_transform(table)
         return out
-    
+
+
     @staticmethod
     def lda(table, k, database):
         matrix = LDA(n_components=k)
         out = matrix.fit_transform(table)
         return out
-    
+
+
     @staticmethod
     def decompose_text(term_space, k, method, database):
         table = database.get_txt_desc_table(term_space)
@@ -35,9 +39,15 @@ class Decompose():
         elif method == 'lda':
             f = Decompose.lda
         
-        returnval = f(table, k, database)
-        return returnval
-    
+        # put table in appropriate format - transpose and standardize.
+        indexes = table.columns
+        table = table.T
+        table = StandardScaler().fit_transform(table)
+
+        out = f(table, k, database)
+        return DataFrame(out, index=indexes)
+
+
     @staticmethod
     @timed
     def decompose_vis(model, k, method, database):
@@ -56,4 +66,4 @@ class Decompose():
     @timed
     def decompose_loc(k, method, locationid, database):
         table = database.get_vis_table(locationid=locationid)
-        pass # TASK 5 IMPLEMENT
+        raise NotImplementedError # TASK 5 IMPLEMENT

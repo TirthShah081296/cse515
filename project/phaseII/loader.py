@@ -106,7 +106,7 @@ class DescriptionReader(GenericReader):
                 for i in range(j,len(tokens), 4):
                     term, tf, idf, tfidf = tokens[i : i+4]
                     term = term.replace('\"', '')
-                    table[an_id][term] = 1 # For this phase, we don't need to store the different values. Just whether the term is present.
+                    table[an_id][term] = idf # At TAs Recommendation I chose one of these models arbitrarily.
 
         return table
 

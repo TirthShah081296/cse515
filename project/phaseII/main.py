@@ -22,6 +22,7 @@ class Interface():
             user_input = input("\nEnter a Command:$ ")
             user_input = user_input.split(' ')
             command = user_input[0]
+            command.replace('_', '')
             # Get method with this name - makes it easy to create new interface methods 
             #   without having to edit this method.
             try:
@@ -114,7 +115,13 @@ class Interface():
 
 
         response = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
-        print(response)
+        for i, col_id in enumerate(response):
+            column = response[col_id]
+            column = column.sort_values(ascending=False)
+            print('-'*50)
+            print("LATENT SEMANTIC " + str(i))
+            print('-'*50)
+            print(column)
 
 
     # TODO - this should be implemented so it can follow Task 1, not be restarted
