@@ -13,6 +13,21 @@ class Interface():
                 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
         self.__io__()
 
+    
+
+    def __print_latent_semantics__(self, table):
+        """
+        Pretty prints out the latent semantics.
+        :param DataFrame table: The latent semantic vectors. Columns are individual vectors, rows are features.
+        """
+        for i, col_id in enumerate(table):
+            column = table[col_id]
+            column = column.sort_values(ascending=False)
+            print('-'*50)
+            print("LATENT SEMANTIC " + str(i))
+            print('-'*50)
+            print(column)
+
 
 
     def __io__(self):
@@ -113,15 +128,9 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
+        response = Decompose.txt_latent_semantics(term_space, k, method.lower(), self.__database__)
+        self.__print_latent_semantics__(response)
 
-        response = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
-        for i, col_id in enumerate(response):
-            column = response[col_id]
-            column = column.sort_values(ascending=False)
-            print('-'*50)
-            print("LATENT SEMANTIC " + str(i))
-            print('-'*50)
-            print(column)
 
 
     # TODO - this should be implemented so it can follow Task 1, not be restarted
@@ -160,8 +169,9 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        # YOUR FUNCTION HERE. #####################################################
-        
+        reduced_table = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
+        # Get nearest items from latent semantics. Neighbor.knn may be useful for you.
+        pass
 
 
 
@@ -203,9 +213,9 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         # WRITE CODE IN THESE FUNCTIONS #####################################################
-        Decompose.decompose_vis(vis_model, k, method, self.__database__) # Get latent semantics.
+        reduced_table = Decompose.decompose_vis(vis_model, k, method, self.__database__) # Get latent semantics.
         # Get nearest items from latent semantics. Neighbor.knn may be useful for you.
-
+        pass
 
 
 
@@ -243,8 +253,9 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         # WRITE CODE IN THESE FUNCTIONS #####################################################
-        Decompose.decompose_loc_vis(vis_model, k, method, locationid, self.__database__) # Get latent semantics.
+        reduced_table = Decompose.decompose_loc_vis(vis_model, k, method, locationid, self.__database__) # Get latent semantics.
         # Get nearest 5 locations from latent semantics. Neighbor.knn may be useful for you.
+        pass
 
 
     
@@ -280,9 +291,9 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         # WRITE CODE IN THESE FUNCTIONS #####################################################
-        Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
+        reduced_table = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
         # Get nearest 5 locations by latent semantics. Neighbor.knn may be useful for you.
-
+        pass
     
 
 
