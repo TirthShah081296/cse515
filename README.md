@@ -1,9 +1,10 @@
 # CSE515
 Code developed for CSE 515 class.
 
-NOTE - Use project/phase1, not Project/Phase I
+The code was written using Python 3.7.0, but any recent Python 3 version should work.
 
 This code has the following python-library dependencies:
-  1. Numpy
-  2. Pandas
-  3. lxml
+  1. numpy 1.15.2
+  2. pandas 0.23.4
+  3. lxml 4.2.5
+  4. scikit-learn 0.20.0
