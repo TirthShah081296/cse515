@@ -3,6 +3,7 @@ from loader import Loader
 from database import Database
 from neighbor import Neighbor
 from decompose import Decompose
+from distance import Similarity
 
 class Interface():
 
@@ -292,8 +293,25 @@ class Interface():
 
         # WRITE CODE IN THESE FUNCTIONS #####################################################
         reduced_table = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
+        reduced_table.to_csv('Image-semantic_task5.csv')
+        reducedLocations = dict() # A dictionary that has locationid as the key and the reduced tables as the values.
+        reducedLocations[locationid] = reduced_table
+        for i in [x for x in range(1,31) if x != locationid]:
+            reducedLocations[i] = Decompose.decompose_loc(k, method, i, self.__database__)
+        sim = Similarity.dot_similarity(reduced_table,reducedLocations[1])
+        # reduced_table.iloc[0].to_csv('row.csv')
+        # reducedLocations[1].to_csv('thetable.csv')
+        sim.to_csv('similarity.csv')
+        # sim_numpy = sim.as_matrix()
+        value = sim.sum(axis= None)
+        print (value)
+        # csv_out = csv.writer(open("dictionary.csv", "w"))
+        # pickle.dump(reducedLocations, pickle_out)
+        # pickle_out.close()
+        # for key, val in reducedLocations.items():
+        #     csv_out.writerow([key, val])
         # Get nearest 5 locations by latent semantics. Neighbor.knn may be useful for you.
-        pass
+        # pass
     
 
 
