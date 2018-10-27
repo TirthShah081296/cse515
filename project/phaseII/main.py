@@ -296,7 +296,7 @@ class Interface():
         # WRITE CODE IN THESE FUNCTIONS #####################################################
         reduced_table = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
         reduced_table.to_csv('Image-semantic_task5.csv')
-        reducedLocations = dict() # A dictionary that has locationid as the key and the reduced tables as the values.
+        reducedLocations = dict()  # A dictionary that has locationid as the key and the reduced tables as the values.
         # reducedLocations[locationid] = reduced_table
         similarityScore = dict()
         for i in [x for x in range(1,31)]:
@@ -307,17 +307,20 @@ class Interface():
             sim = cosine_similarity(reduced_table,reducedLocations[i])
             # The dot_similarity (matrix, matrix) returns a 2D array that has ids of one location as rows, and another location's id as columns.
             # The values are the similarity between each id (Just like a similarity matrix).
-            # upperSim = numpy.triu(sim)
-            # itermediateSum = upperSim.sum(axis=None)
+
             similarityScore[i] = Scoring.score_matrix(sim)
+        orderedSimilarityList = sorted(similarityScore, key=similarityScore.__getitem__) # returns a list containing the Locations ids in the increasing order of the similarity
+        orderedSimilarityList.reverse()  # Reverse the list to get it in the decreasing order
         print (similarityScore)
+        print("The most related 5 locations are:")
+        for i in range(5):
+            print("Id: ", orderedSimilarityList[i], "Score: ", similarityScore[orderedSimilarityList[i]])
         # sim = cosine_similarity(reduced_table, reducedLocations[1])
         # numpy.savetxt("similarity.csv", sim, delimiter= ",")
         # sim.to_csv('similarity.csv')
         # reduced_table.iloc[0].to_csv('row.csv')
         # reducedLocations[1].to_csv('thetable.csv')
 
-        # sim_numpy = sim.as_matrix()
 
         # print ("Score ", similarityScore)
 

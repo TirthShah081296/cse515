@@ -52,3 +52,11 @@ class Scoring():
             sim_matrix = np.delete(sim_matrix, (x), axis=0)
             sim_matrix = np.delete(sim_matrix, (y), axis=1)
         return similarity / denominator
+
+    # Explanation of the above algorithm to find a similarity score for a similarity matrix:
+    # Sum of max. vals is equal to 0.
+    # Select maximum value from doc-doc matrix and add it to Sum of max. vals.
+    # Remove row and column with maximum value from the matrix.
+    # Repeat steps 2-3 until rows or columns are ended.
+    # Denominate Sum of max. vals by average number of key words in two texts.
+    # Final estimation would be equal to 1, if both documents have identical length, and every word from Doc 1 has equivalent in Doc 2.
