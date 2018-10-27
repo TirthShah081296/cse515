@@ -3,7 +3,9 @@ from loader import Loader
 from database import Database
 from neighbor import Neighbor
 from decompose import Decompose
-from distance import Similarity
+from distance import Scoring
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy
 
 class Interface():
 
@@ -295,16 +297,30 @@ class Interface():
         reduced_table = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
         reduced_table.to_csv('Image-semantic_task5.csv')
         reducedLocations = dict() # A dictionary that has locationid as the key and the reduced tables as the values.
-        reducedLocations[locationid] = reduced_table
-        for i in [x for x in range(1,31) if x != locationid]:
-            reducedLocations[i] = Decompose.decompose_loc(k, method, i, self.__database__)
-        sim = Similarity.dot_similarity(reduced_table,reducedLocations[1])
+        # reducedLocations[locationid] = reduced_table
+        similarityScore = dict()
+        for i in [x for x in range(1,31)]:
+            if i == locationid:
+                reducedLocations[i] = reduced_table
+            else:
+                reducedLocations[i] = Decompose.decompose_loc(k, method, i, self.__database__)
+            sim = cosine_similarity(reduced_table,reducedLocations[i])
+            # The dot_similarity (matrix, matrix) returns a 2D array that has ids of one location as rows, and another location's id as columns.
+            # The values are the similarity between each id (Just like a similarity matrix).
+            # upperSim = numpy.triu(sim)
+            # itermediateSum = upperSim.sum(axis=None)
+            similarityScore[i] = Scoring.score_matrix(sim)
+        print (similarityScore)
+        # sim = cosine_similarity(reduced_table, reducedLocations[1])
+        # numpy.savetxt("similarity.csv", sim, delimiter= ",")
+        # sim.to_csv('similarity.csv')
         # reduced_table.iloc[0].to_csv('row.csv')
         # reducedLocations[1].to_csv('thetable.csv')
-        sim.to_csv('similarity.csv')
+
         # sim_numpy = sim.as_matrix()
-        value = sim.sum(axis= None)
-        print (value)
+
+        # print ("Score ", similarityScore)
+
         # csv_out = csv.writer(open("dictionary.csv", "w"))
         # pickle.dump(reducedLocations, pickle_out)
         # pickle_out.close()

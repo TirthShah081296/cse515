@@ -1,3 +1,4 @@
+import numpy as np
 class Distance():
     
     @staticmethod
@@ -38,3 +39,16 @@ class Similarity():
     @staticmethod
     def dot_similarity(vector, table):
         return table.dot(vector.T)
+
+class Scoring():
+
+    @staticmethod
+    def score_matrix(sim_matrix):
+        similarity = 0
+        denominator = sum(sim_matrix.shape) / 2
+        for i in range(min(sim_matrix.shape)):
+            x, y = np.where(sim_matrix == np.max(sim_matrix))[0][0], np.where(sim_matrix == np.max(sim_matrix))[1][0]
+            similarity += sim_matrix[x, y]
+            sim_matrix = np.delete(sim_matrix, (x), axis=0)
+            sim_matrix = np.delete(sim_matrix, (y), axis=1)
+        return similarity / denominator
