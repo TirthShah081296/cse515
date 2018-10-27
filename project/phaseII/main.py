@@ -5,7 +5,8 @@ from neighbor import Neighbor
 from decompose import Decompose
 from distance import Scoring
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy
+import numpy as np
+from pandas import DataFrame as df
 
 class Interface():
 
@@ -360,9 +361,36 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        # YOUR FUNCTION HERE. #####################################################
+        # First getting all the location tables having all the visual discriptors.
 
-    
+        # IMP NOTE: Remember to change all the static values after the test data arrives.
+        all_location_tables = dict()
+        for id in range(1,31):
+            all_location_tables[id] = Database.get_vis_table(self.__database__,locationid=id)
+        # print(all_location_tables.keys(), len(all_location_tables))
+        # all_location_tables[2].to_csv('atable.csv')
+
+        # Start finding the similarity between each pair of locations and store the results into a dictionary.
+        if isfile('./all_similarities.npy'):
+            all_similarities = np.load('all_similarities.npy').item()
+        else:
+            all_similarities = dict()
+            for i in range(1,31):
+                for j in range(i,31):
+                    cos_sim = cosine_similarity(all_location_tables[i], all_location_tables[j])
+                    all_similarities[(i, j)] = Scoring.score_matrix(cos_sim)
+                    all_similarities[(j, i)] = all_similarities[(i, j)]
+            np.save('all_similarities.npy', all_similarities)
+
+        # print(all_similarities)
+        # print(len(all_similarities))
+        similarity_matrix = df(index=range(1,31),columns=range(1,31))
+        for i in range(1,31):
+            sim_list = list()
+            for j in range(1,31):
+                sim_list.append(all_similarities[(i, j)])
+            similarity_matrix.loc[i] = sim_list
+        similarity_matrix.to_csv('Task6_SimilarityMatrix.csv')
 
 
     def task7(self, *args):
