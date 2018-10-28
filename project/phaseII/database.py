@@ -92,7 +92,8 @@ class Database():
                 readr = reader(f)
                 ncol=len(next(readr))
             # load into dataframe.
-            table = pd.read_csv(file, index_col=0, header=None, names=range(ncol-1), dtype='float')
+            col_names = [model + '_' + str(i) for i in range(ncol-1)]
+            table = pd.read_csv(file, index_col=0, header=None, names=col_names, dtype='float')
             self.vis_descriptors[locationid, model] = table.sort_index().to_sparse().fillna(0)
 
         print("Visual Descriptors Loaded...")

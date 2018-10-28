@@ -23,11 +23,14 @@ class Interface():
 
     
 
-    def __print_latent_semantics__(self, table):
+    def __print_latent_semantics__(self, table, save=True):
         """
         Pretty prints out the latent semantics.
         :param DataFrame table: The latent semantic vectors. Columns are individual vectors, rows are features.
         """
+        table = table.T
+        if save:
+            table.to_csv('latent_semantics.csv') # For easy reference to teacher
         for i, col_id in enumerate(table):
             column = table[col_id]
             column = column.sort_values(ascending=False)
@@ -111,7 +114,7 @@ class Interface():
         Description:\tCalculates the top k latent semantics in the term space given a \
         methodology. Latent semantics will be presented in term-weight pairs.
         Arguments:
-        \tTerm Space - What text description type to pull. (user, photo, location)
+        \tTerm Space - What text description type to pull. (user, photo, poi)
         \tK - Number of latent semantics to return.
         \tMethod - The decomposition method to use. (PCA, SVD, LDA)
         """
@@ -136,8 +139,8 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        response = Decompose.txt_latent_semantics(term_space, k, method.lower(), self.__database__)
-        self.__print_latent_semantics__(response)
+        _, latent_semantics = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
+        self.__print_latent_semantics__(latent_semantics)
 
 
 
@@ -149,7 +152,7 @@ class Interface():
         Description:\tIdentifies the top k latent semantics uses an id in the term \
         space to identify the most related j ids.
         Arguments:
-        \tTerm Space - What text description type to pull. (user, photo, location).
+        \tTerm Space - What text description type to pull. (user, photo, poi).
         \tK - Number of latent semantics to return.
         \tMethod - The decomposition method to use. (PCA, SVD, LDA).
         \tJ - Number of nearest terms to find.
@@ -174,12 +177,13 @@ class Interface():
             method = args[2]
             j = int(args[3])
             anid = args[4]
+            if term_space == 'photo' or term_space == 'poi':
+                anid = int(anid)
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        latent_semantics = Decompose.txt_latent_semantics(term_space, k, method, self.__database__)
+        reduced_table, latent_semantics = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
         self.__print_latent_semantics__(latent_semantics)
-        reduced_table = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
         vector = reduced_table.loc[anid]
         neighbors = Neighbor.knn(j, vector, reduced_table)
         print("NEIGHBORS to " + str(anid))
@@ -324,16 +328,17 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         # WRITE CODE IN THESE FUNCTIONS #####################################################
-        reduced_table = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
-        reduced_table.to_csv('Image-semantic_task5.csv')
+        reduced_table, latent_semantics = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
+        # reduced_table.to_csv('Image-semantic_task5.csv')
+        self.__print_latent_semantics__(latent_semantics)
         reducedLocations = dict()  # A dictionary that has locationid as the key and the reduced tables as the values.
-        # reducedLocations[locationid] = reduced_table
         similarityScore = dict()
-        for i in [x for x in range(1,31)]:
+        for i in range(1,31):
             if i == locationid:
                 reducedLocations[i] = reduced_table
             else:
-                reducedLocations[i] = Decompose.decompose_loc(k, method, i, self.__database__)
+                rtable, _ = Decompose.decompose_loc(k, method, i, self.__database__)
+                reducedLocations[i] = rtable
             sim = cosine_similarity(reduced_table,reducedLocations[i])
             # The dot_similarity (matrix, matrix) returns a 2D array that has ids of one location as rows, and another location's id as columns.
             # The values are the similarity between each id (Just like a similarity matrix).
@@ -347,7 +352,6 @@ class Interface():
             print("Id: ", orderedSimilarityList[i], "Score: ", similarityScore[orderedSimilarityList[i]])
     
 
-    @timed
     def task6(self, *args):
         """
         Command:\ttask6 <k>
@@ -380,9 +384,6 @@ class Interface():
         all_location_tables = dict()
         for id in range(1,31):
             all_location_tables[id] = Database.get_vis_table(self.__database__,locationid=id)
-        # print(all_location_tables.keys(), len(all_location_tables))
-        # all_location_tables[2].to_csv('atable.csv')
-
         # Start finding the similarity between each pair of locations and store the results into a dictionary.
         if isfile('./all_similarities.npy'):
             all_similarities = np.load('all_similarities.npy').item()
@@ -395,8 +396,6 @@ class Interface():
                     all_similarities[(j, i)] = all_similarities[(i, j)]
             np.save('all_similarities.npy', all_similarities)
 
-        # print(all_similarities)
-        # print(len(all_similarities))
         similarity_matrix = df(index=range(1,31),columns=range(1,31))
         for i in range(1,31):
             sim_list = list()
@@ -407,12 +406,10 @@ class Interface():
         print("Location-Location Similarity matrix created...")
 
         reduced = SVD(n_components=k)
-        reduced_table = reduced.fit_transform(similarity_matrix)
+        # reduced_table = reduced.fit_transform(similarity_matrix)
+        reduced.fit(similarity_matrix)
         VTranspose = df(data=reduced.components_, index=range(1,k+1),columns=range(1,31))
-        # reduced_table.to_csv('task6reducedtable.csv')
-        # np.savetxt("task6reducedtable.csv", reduced_table, delimiter=",")
         VTranspose.to_csv('task6transposetable.csv')
-        # np.savetxt("task6transposetable.csv", VTranspose, delimiter=",")
 
         filename = 'devset_topics.xml'
         tree = ET.parse(filename)
@@ -428,13 +425,16 @@ class Interface():
             i += 1
 
         print("Top k latent semantics in form of their location-weight pair are:")
-        for index, row in VTranspose.iterrows():
+        for _, row in VTranspose.iterrows():
             for j in range(1, 31):
                 loc = location_name[j]
                 location_dict[loc] = row[j]
             sorted_location_dict = sorted(location_dict.items(), key=itemgetter(1), reverse=True)
 
-            print("latent semantic " + str(index) + " : " + str(sorted_location_dict))
+            # print("latent semantic " + str(index) + " : " + str(sorted_location_dict))
+            print(f"LATENT SEMANTIC {i}")
+            for key, value in sorted_location_dict:
+                print(f"{key} : {value}")            
 
 
     def task7(self, *args):
@@ -532,9 +532,6 @@ class Interface():
                         iflag = 1
                         continue
         imageDictionary[icurrent_id] = itermlist
-        # print(userDictionary)
-        # print(len(imageDictionary.keys()))
-        # print(len(userDictionary.keys()))
 
         locNames = dict()
         tree = ET.parse('./devset_topics.xml')

@@ -15,8 +15,9 @@ def reindex(f):
     @wraps(f)
     def wrapper(table, k):
         indexes = table.index
-        out = f(table, k)
-        return DataFrame(out, index=indexes)
+        cols = table.columns
+        out, principle_comp = f(table, k)
+        return DataFrame(out, index=indexes, columns=range(k)), DataFrame(principle_comp, index=range(k), columns=cols)
     return wrapper
 
 class Decompose():
@@ -32,7 +33,7 @@ class Decompose():
         """
         matrix = SVD(n_components=k)
         out = matrix.fit_transform(table)
-        return out
+        return out, matrix.components_
 
     @staticmethod
     @reindex
@@ -45,7 +46,7 @@ class Decompose():
         """
         matrix = PCA(n_components=k)
         out = matrix.fit_transform(table)
-        return out
+        return out, matrix.components_
 
 
     @staticmethod
@@ -59,7 +60,7 @@ class Decompose():
         """
         matrix = LDA(n_components=k)
         out = matrix.fit_transform(table)
-        return out
+        return out, matrix.components_
 
     
     @staticmethod
@@ -84,42 +85,26 @@ class Decompose():
 
 
     @staticmethod
-    def txt_latent_semantics(term_space, k, method, database):
+    def decompose_text(term_space, k, method, database):
         """
-        Used by task1 and task2 - Identifies the first k latent semantics
+        Used by task1 and task2.
         :param str term_space: The type of term space to grab. (user, photo, location)
         :param int k: The number of latent semantics to use.
         :param str method: The method of decomposition to use (pca, lda, svd)
-        :return DataFrame with reduced objects.
+        :return DataFrame with reduced objects and latent semantics.
         """
         table = database.get_txt_desc_table(term_space)
-        # Takes transpose of table to find the latent semantic vectors, instead of object vectors.
-        reduced_table = Decompose.switchboard(table.T, k, method)
-        return reduced_table
+        reduced, principle_comp = Decompose.switchboard(table, k, method)
+        return reduced, principle_comp
     
 
     @staticmethod
-    def vis_latent_semantic(k, method, database, model=None, locationid=None):
-        """
-        TESTING FOR COMPARISON TO TEAM CODE.
-        """
-        table = database.get_vis_table(locationid=locationid, model=model)
-        reduced_table = Decompose.switchboard(table.T, k, method)
-        return reduced_table
+    def decompose_loc(k, method, locationid, database):
+        table = database.get_vis_table(locationid=locationid)
+        reduced, ps = Decompose.switchboard(table, k, method)
+        return reduced, ps
 
-
-    @staticmethod
-    def decompose_text(term_space, k, method, database):
-        """
-        Used by task2.
-        :param str term_space: The type of term space to grab. (user, photo, location)
-        :param int k: The number of latent semantics to use.
-        :param str method: The method of decomposition to use (pca, lda, svd)
-        :return DataFrame with reduced objects.
-        """
-        table = database.get_txt_desc_table(term_space)
-        return Decompose.switchboard(table, k, method)
-
+    ########################################################################################
 
     @staticmethod
     def decompose_vis(model, k, method, database):
@@ -136,12 +121,6 @@ class Decompose():
     def decompose_loc_vis2(model, k, method, locationid, database):
         table = database.get_vis_table(model=model, locationid=locationid)
         return Decompose.switchboard2(table, k, method)
-    
-
-    @staticmethod
-    def decompose_loc(k, method, locationid, database):
-        table = database.get_vis_table(locationid=locationid)
-        return Decompose.switchboard(table, k, method)
     
     @staticmethod
     def switchboard2(table, k, method):
@@ -183,6 +162,7 @@ class Decompose():
         matrix = LDA(n_components=k)
         out = matrix.fit_transform(table)
         return DataFrame(data=out, index=indexes, columns=range(k))
+
     @staticmethod
     def svd1(table, k):
         """
