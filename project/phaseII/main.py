@@ -5,8 +5,11 @@ from neighbor import Neighbor
 from decompose import Decompose
 from distance import Scoring
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.decomposition import TruncatedSVD as SVD
 import numpy as np
 from pandas import DataFrame as df
+import xml.etree.ElementTree as ET
+from operator import itemgetter
 
 class Interface():
 
@@ -391,7 +394,37 @@ class Interface():
                 sim_list.append(all_similarities[(i, j)])
             similarity_matrix.loc[i] = sim_list
         similarity_matrix.to_csv('Task6_SimilarityMatrix.csv')
+        print("Location-Location Similarity matrix created...")
 
+        reduced = SVD(n_components=k)
+        reduced_table = reduced.fit_transform(similarity_matrix)
+        VTranspose = df(data=reduced.components_, index=range(1,k+1),columns=range(1,31))
+        # reduced_table.to_csv('task6reducedtable.csv')
+        # np.savetxt("task6reducedtable.csv", reduced_table, delimiter=",")
+        VTranspose.to_csv('task6transposetable.csv')
+        # np.savetxt("task6transposetable.csv", VTranspose, delimiter=",")
+
+        filename = './devset_topics.xml'
+        tree = ET.parse(filename)
+        root = tree.getroot()
+        location_name = dict()
+        location_dict = dict()
+        i = 0
+
+        while i < len(root):
+            v1 = int(root[i][0].text)
+            v2 = root[i][1].text
+            location_name[v1] = v2
+            i += 1
+
+        print("Top k latent semantics in form of their location-weight pair are:")
+        for index, row in VTranspose.iterrows():
+            for j in range(1, 31):
+                loc = location_name[j]
+                location_dict[loc] = row[j]
+            sorted_location_dict = sorted(location_dict.items(), key=itemgetter(1), reverse=True)
+
+            print("latent semantic " + str(index) + " : " + str(sorted_location_dict))
 
     def task7(self, *args):
         """
@@ -420,9 +453,143 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        # YOUR FUNCTION HERE. #####################################################
+        # First getting the terms of all the user ids, image ids and location ids into dictionaries.
+        # A very naive code implementation.
+        # Add these files to the PhaseII folder, or mention the path to the files.
+        userFile = './devset_textTermsPerUser.txt'
+        imageFile = './devset_textTermsPerImage.txt'
+        locationFile = './devset_textTermsPerPOI.wFolderNames.txt'
 
+        userDictionary = dict()  # contains userid as the key and terms as its terms as the value.
+        imageDictionary = dict()  # contains imageid as the key and terms as its terms as the value.
+        locationDictionary = dict()  # contains locationid as the key and terms as its terms as the value.
 
+        uflag = 1
+        utermlist = list()
+        uturnon = 0
+        ucurrent_id = ""
+        with open(userFile, encoding = 'latin-1') as f:
+            for line in f:
+                for word in line.split():
+                    if uflag == 1:
+                        if not word.startswith('"'):
+                            if uturnon:
+                                userDictionary[ucurrent_id] = utermlist
+                                utermlist.clear()
+                            ucurrent_id = word
+                            uturnon = 1
+                            continue
+                        utermlist.append(word)
+                        uflag = 2
+                        continue
+                    if uflag == 2:
+                        uflag = 3
+                        continue
+                    if uflag == 3:
+                        uflag = 4
+                        continue
+                    if uflag == 4:
+                        uflag = 1
+                        continue
+        userDictionary[ucurrent_id] = utermlist
+
+        iflag = 1
+        itermlist = list()
+        iturnon = 0
+        icurrent_id = ""
+        with open(imageFile, encoding='latin-1') as f:
+            for line in f:
+                for word in line.split():
+                    if iflag == 1:
+                        if not word.startswith('"'):
+                            if iturnon:
+                                imageDictionary[icurrent_id] = itermlist
+                                itermlist.clear()
+                            icurrent_id = word
+                            iturnon = 1
+                            continue
+                        itermlist.append(word)
+                        iflag = 2
+                        continue
+                    if iflag == 2:
+                        iflag = 3
+                        continue
+                    if iflag == 3:
+                        iflag = 4
+                        continue
+                    if iflag == 4:
+                        iflag = 1
+                        continue
+        imageDictionary[icurrent_id] = itermlist
+        # print(userDictionary)
+        # print(len(imageDictionary.keys()))
+        # print(len(userDictionary.keys()))
+
+        locNames = dict()
+        tree = ET.parse('./devset_topics.xml')
+        root = tree.getroot()
+        for elem1 in root:
+            locNames[elem1[1].text] = int(elem1[0].text)
+
+        # print (locNames)
+        lflag = 1
+        ltermlist = list()
+        lturnon = 0
+        lcurrent_id = ""
+        with open(locationFile, encoding='utf8') as f:
+            for line in f:
+                for word in line.split():
+                    if lflag == 1:
+                        if word.startswith('"'):
+                            ltermlist.append(word)
+                            # current_term = word
+                            lflag = 2
+                            continue
+                        if lturnon:
+                            locationDictionary[lcurrent_id] = ltermlist
+                            ltermlist.clear()
+                        lcurrent_id = locNames[word]
+                        lturnon = 1
+                        # idlist.append(current_id)
+                        # if turnon == 1:
+                        #     turnon = 0
+                        # else:
+                        #     if current_id == int(sys.argv[1]):
+                        #         turnon = 1
+                        lflag = 5
+                        continue
+                    elif lflag == 2:
+                        # tflist.append(word)
+                        # main_dict[(current_id, current_term, 'TF')] = float(word)
+                        lflag = 3
+                        continue
+                    elif lflag == 3:
+                        # dflist.append(word)
+                        # main_dict[(current_id, current_term, 'DF')] = float(word)
+                        lflag = 4
+                        continue
+                    elif lflag == 4:
+                        # idflist.append(word)
+                        # print current_id, current_term
+                        # main_dict[(current_id, current_term, 'TF-IDF')] = float(word)
+                        lflag = 1
+                        continue
+                    elif lflag == 5:
+                        if word.startswith('"'):
+                            ltermlist.append(word)
+                            # if turnon == 1:
+                            #     reqTermList.append(word)
+                            # current_term = word
+                            lflag = 2
+                            continue
+                        continue
+        locationDictionary[lcurrent_id] = ltermlist
+
+        # print(len(locationDictionary))
+        # print(len(userDictionary))
+        # print(len(imageDictionary))
+
+        # At this point the dictionaries have a list of terms for each ids
 
 
     def quit(self, *args):
