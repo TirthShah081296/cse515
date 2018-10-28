@@ -4,6 +4,7 @@ from sklearn.decomposition import TruncatedSVD as SVD
 from pandas import DataFrame
 from util import timed
 from functools import wraps
+import numpy as np
 
 
 
