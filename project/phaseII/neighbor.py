@@ -115,3 +115,78 @@ class Neighbor():
         table = table.iloc[:, vec_indexes]
 
         return Neighbor.knn(k, vector, table, processes)
+    
+    @staticmethod
+    def knn_dot(k, vector, table):
+
+        def take_first(elem):
+            return elem[0]
+
+        result = []
+        vector = np.array(vector)
+        indexes = table.index
+        table = np.array(table)
+        i = 0
+        for other_vector in table:
+            other_vector_id = indexes[i]
+            i = i + 1
+            other_vector = np.array(other_vector)
+            similarity = abs(dot(vector, other_vector))
+            similarity = similarity/(norm(vector)*norm(other_vector))
+            result.append([similarity, other_vector_id])
+
+        result.sort(key=take_first)
+        result.reverse()
+        nearest = result[0:k]
+
+        return nearest
+
+    @staticmethod
+    def knn_vd(n, this_matrix, vis_model, k, method, this_matrix_id, database):
+
+        def take_first(elem):
+            return elem[0]
+
+        this_matrix = np.array(this_matrix)
+        locationid = database.get_location_ids()
+        result = []
+        for i in locationid:
+            that_matrix = Decompose.decompose_loc_vis2(vis_model, k, method, i, database)
+            that_matrix = np.array(that_matrix)
+            similarity = cosine_similarity(this_matrix, that_matrix)
+            similarity = np.array(similarity).sum()
+            similarity = similarity / (this_matrix.shape[0] * that_matrix.shape[0])
+            result.append([similarity, i])
+        result.sort(key=take_first)
+        result.reverse()
+        nearest = result[0:n]
+        for i in result:
+            if i[1] == this_matrix_id:
+                print "score of current location:" + str(i[0])
+        return nearest
+
+    @staticmethod
+    def knn_loc(n, this_vector, vis_model, k, method, database):
+
+        def take_first(elem):
+            return elem[0]
+
+        this_vector = np.array(this_vector)
+        locationid = database.get_location_ids()
+        result = []
+        for i in locationid:
+            that_matrix = Decompose.decompose_loc_vis2(vis_model, k, method, i, database)
+            that_matrix = np.array(that_matrix)
+            loc_similarity = []
+            loc_similarity = np.array(loc_similarity)
+            for that_vector in that_matrix:
+                similarity = abs(dot(this_vector, that_vector))
+                similarity = similarity / (norm(this_vector) * norm(that_vector))
+                loc_similarity.append(similarity)
+            loc_similarity = loc_similarity.sum()
+            loc_similarity = loc_similarity / that_matrix.shape[0]
+            result.append([loc_similarity, i])
+        result.sort(key=take_first)
+        result.reverse()
+        nearest = result[0:n]
+        return nearest
