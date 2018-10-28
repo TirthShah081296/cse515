@@ -183,7 +183,7 @@ class Neighbor():
                 similarity = abs(dot(this_vector, that_vector))
                 similarity = similarity / (norm(this_vector) * norm(that_vector))
                 loc_similarity.append(similarity)
-            loc_similarity = loc_similarity.sum()
+            loc_similarity = np.array(loc_similarity).sum()
             loc_similarity = loc_similarity / that_matrix.shape[0]
             result.append([loc_similarity, i])
         result.sort(key=take_first)
