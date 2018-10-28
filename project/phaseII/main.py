@@ -219,13 +219,27 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        # WRITE CODE IN THESE FUNCTIONS #####################################################
-        reduced_table = Decompose.decompose_vis(vis_model, k, method, self.__database__) # Get latent semantics.
-        # Get nearest items from latent semantics. Neighbor.knn may be useful for you.
-        pass
+        # Get latent semantics.
+        matrix = Decompose.decompose_vis(vis_model, k, method, self.__database__)
 
+        # Get nearest images from latent semantics.
+        vector = matrix.loc[anid]
+        vector1 = []
+        for i in range(k):
+            vector1.append(vector[i])
+        print("5 nearest images to " + args[3] + " are:")
+        nearest = Neighbor.knn_dot(5, vector1, matrix)
+        print("IMAGE ID\t\tSCORE")
+        for values in nearest:
+            print(str(values[1]) + "\t\t" + str(values[0]))
 
-
+        # Get nearest locations from latent semantics.
+        print("5 nearest locations to " + args[3] + " are:")
+        nearest = Neighbor.knn_loc(5, vector1, vis_model, k, method, self.__database__)
+        print("LOCATION ID\t\tSCORE")
+        for values in nearest:
+            print(str(values[1]) + "\t\t\t" + str(values[0]))
+            
     def task4(self, *args):
         """
         Command:\ttask4 <locationid> <vis model> <k> <method>
@@ -259,12 +273,16 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
-        # WRITE CODE IN THESE FUNCTIONS #####################################################
-        reduced_table = Decompose.decompose_loc_vis(vis_model, k, method, locationid, self.__database__) # Get latent semantics.
+        # Get latent semantics.
+        matrix = Decompose.decompose_loc_vis(vis_model, k, method, locationid, self.__database__)
+
         # Get nearest 5 locations from latent semantics. Neighbor.knn may be useful for you.
-        pass
 
-
+        nearest = Neighbor.knn_vd(5, matrix, vis_model, k, method, locationid, self.__database__)
+        print("5 nearest locations to " + args[0] + " are:")
+        print("LOCATION ID\t\tSCORE")
+        for values in nearest:
+            print(str(values[1]) + "\t\t\t" + str(values[0]))
     
     def task5(self, *args):
         """
