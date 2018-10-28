@@ -86,7 +86,7 @@ class Decompose():
     @staticmethod
     def txt_latent_semantics(term_space, k, method, database):
         """
-        Used by task1 - Identifies the first k latent semantics
+        Used by task1 and task2 - Identifies the first k latent semantics
         :param str term_space: The type of term space to grab. (user, photo, location)
         :param int k: The number of latent semantics to use.
         :param str method: The method of decomposition to use (pca, lda, svd)
@@ -94,6 +94,16 @@ class Decompose():
         """
         table = database.get_txt_desc_table(term_space)
         # Takes transpose of table to find the latent semantic vectors, instead of object vectors.
+        reduced_table = Decompose.switchboard(table.T, k, method)
+        return reduced_table
+    
+
+    @staticmethod
+    def vis_latent_semantic(k, method, database, model=None, locationid=None):
+        """
+        TESTING FOR COMPARISON TO TEAM CODE.
+        """
+        table = database.get_vis_table(locationid=locationid, model=model)
         reduced_table = Decompose.switchboard(table.T, k, method)
         return reduced_table
 
@@ -117,7 +127,7 @@ class Decompose():
         matrix = Decompose.switchboard1(table, k, method)
         return matrix  
 
-   @staticmethod
+    @staticmethod
     def decompose_loc_vis(model, k, method, locationid, database):
         table = database.get_vis_table(model=model, locationid=locationid)
         return Decompose.switchboard1(table, k, method)

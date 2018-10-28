@@ -1,8 +1,8 @@
-from os.path import isfile, abspath, isdir
-from loader import Loader
-from database import Database
 from neighbor import Neighbor
 from decompose import Decompose
+from loader import Loader
+from database import Database
+from os.path import isfile, abspath, isdir
 from distance import Scoring
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import TruncatedSVD as SVD
@@ -10,6 +10,7 @@ import numpy as np
 from pandas import DataFrame as df
 import xml.etree.ElementTree as ET
 from operator import itemgetter
+from util import timed
 
 class Interface():
 
@@ -176,9 +177,14 @@ class Interface():
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
+        latent_semantics = Decompose.txt_latent_semantics(term_space, k, method, self.__database__)
+        self.__print_latent_semantics__(latent_semantics)
         reduced_table = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
-        # Get nearest items from latent semantics. Neighbor.knn may be useful for you.
-        pass
+        vector = reduced_table.loc[anid]
+        neighbors = Neighbor.knn(j, vector, reduced_table)
+        print("NEIGHBORS to " + str(anid))
+        for i, neighbor in enumerate(neighbors):
+            print(f"{i}: ID = {neighbor.id}, DIST = {neighbor.dist}")
 
 
 
@@ -195,7 +201,7 @@ class Interface():
         \tK - Number of latent semantics to return.
         \tMethod - The decomposition method to use. (PCA, SVD, LDA).
         \tJ - Number of nearest terms to find.
-        \tID - The id to find nearest neighbors to using the latent semantics.
+        \tID - The id of the image to find nearest neighbors to using the latent semantics.
         """
         if len(args) < 5:
             print("[ERROR] Not enough args were provided. Expected 5 but got " + str(len(args)))
@@ -215,7 +221,7 @@ class Interface():
             k = int(args[1])
             method = args[2]
             j = int(args[3])
-            anid = args[4]
+            anid = int(args[4])
         except:
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
@@ -239,7 +245,8 @@ class Interface():
         print("LOCATION ID\t\tSCORE")
         for values in nearest:
             print(str(values[1]) + "\t\t\t" + str(values[0]))
-            
+
+
     def task4(self, *args):
         """
         Command:\ttask4 <locationid> <vis model> <k> <method>
@@ -283,7 +290,8 @@ class Interface():
         print("LOCATION ID\t\tSCORE")
         for values in nearest:
             print(str(values[1]) + "\t\t\t" + str(values[0]))
-    
+
+
     def task5(self, *args):
         """
         Command:\ttask5 <locationid> <k> <method>
@@ -337,25 +345,9 @@ class Interface():
         print("The most related 5 locations are:")
         for i in range(5):
             print("Id: ", orderedSimilarityList[i], "Score: ", similarityScore[orderedSimilarityList[i]])
-        # sim = cosine_similarity(reduced_table, reducedLocations[1])
-        # numpy.savetxt("similarity.csv", sim, delimiter= ",")
-        # sim.to_csv('similarity.csv')
-        # reduced_table.iloc[0].to_csv('row.csv')
-        # reducedLocations[1].to_csv('thetable.csv')
-
-
-        # print ("Score ", similarityScore)
-
-        # csv_out = csv.writer(open("dictionary.csv", "w"))
-        # pickle.dump(reducedLocations, pickle_out)
-        # pickle_out.close()
-        # for key, val in reducedLocations.items():
-        #     csv_out.writerow([key, val])
-        # Get nearest 5 locations by latent semantics. Neighbor.knn may be useful for you.
-        # pass
     
 
-
+    @timed
     def task6(self, *args):
         """
         Command:\ttask6 <k>
@@ -422,7 +414,7 @@ class Interface():
         VTranspose.to_csv('task6transposetable.csv')
         # np.savetxt("task6transposetable.csv", VTranspose, delimiter=",")
 
-        filename = './devset_topics.xml'
+        filename = 'devset_topics.xml'
         tree = ET.parse(filename)
         root = tree.getroot()
         location_name = dict()
@@ -443,6 +435,7 @@ class Interface():
             sorted_location_dict = sorted(location_dict.items(), key=itemgetter(1), reverse=True)
 
             print("latent semantic " + str(index) + " : " + str(sorted_location_dict))
+
 
     def task7(self, *args):
         """
@@ -474,9 +467,9 @@ class Interface():
         # First getting the terms of all the user ids, image ids and location ids into dictionaries.
         # A very naive code implementation.
         # Add these files to the PhaseII folder, or mention the path to the files.
-        userFile = './devset_textTermsPerUser.txt'
-        imageFile = './devset_textTermsPerImage.txt'
-        locationFile = './devset_textTermsPerPOI.wFolderNames.txt'
+        userFile = 'devset_textTermsPerUser.txt'
+        imageFile = 'devset_textTermsPerImage.txt'
+        locationFile = 'devset_textTermsPerPOI.wFolderNames.txt'
 
         userDictionary = dict()  # contains userid as the key and terms as its terms as the value.
         imageDictionary = dict()  # contains imageid as the key and terms as its terms as the value.

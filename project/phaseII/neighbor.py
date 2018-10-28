@@ -169,7 +169,7 @@ class Neighbor():
         nearest = result[0:n]
         for i in result:
             if i[1] == this_matrix_id:
-                print "score of current location:" + str(i[0])
+                print("score of current location:" + str(i[0]))
         return nearest
 
     @staticmethod
