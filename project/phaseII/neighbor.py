@@ -1,9 +1,16 @@
 from distance import Distance, Similarity
 from heapq import heappush, merge, nsmallest
 from util import timed
-from numpy import union1d
+from numpy.linalg import norm
+from numpy import dot
+import numpy as np
 from multiprocessing import Pool
 from math import ceil
+from decompose import Decompose
+from sklearn.metrics.pairwise import cosine_similarity
+from numpy import union1d
+from database import Database
+from sklearn.neighbors import KNeighborsClassifier
 
 
 # A class is implemented for this tuple to ensure that
