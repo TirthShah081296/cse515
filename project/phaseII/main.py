@@ -11,6 +11,13 @@ from pandas import DataFrame as df
 import xml.etree.ElementTree as ET
 from operator import itemgetter
 from util import timed
+from collections import defaultdict
+from tensorly.decomposition import parafac
+import tensorly as tl
+from sklearn.cluster import KMeans
+# import matplotlib.pyplot as plt
+import _pickle as pk
+
 
 class Interface():
 
@@ -66,7 +73,7 @@ class Interface():
 
     def help(self, *args):
         """
-        Command:\thelp
+        Command:\   thelp
         Description:\tPrints the interface information about the program.
         """
 
@@ -598,6 +605,123 @@ class Interface():
         # print(len(imageDictionary))
 
         # At this point the dictionaries have a list of terms for each ids
+
+        # At this point the dictionaries have a list of terms for each ids
+
+        # Constructing the Tensor.
+        useridToNumber = dict()  # takes a number from 1 to 530 as key, gives out userid. Used for mapping.
+        imageidToNumber = dict()  # takes a number from 1 to 8912 as key, gives out an imageid. Used for mapping.
+        ordered_userDictionary = collections.OrderedDict(sorted(userDictionary.items()))
+        ordered_imageDictionary = collections.OrderedDict(sorted(imageDictionary.items()))
+
+        #  Cleaning the data to remove the error data.
+        i = 1
+        for key, value in ordered_userDictionary.items():
+            if '@' in key:
+                useridToNumber[i] = key
+                i += 1
+        i = 1
+        for key, value in ordered_imageDictionary.items():
+            if float(key) > 5000:
+                imageidToNumber[i] = key
+                i += 1
+        len1 = len(useridToNumber)
+        len2 = len(imageidToNumber)
+        len3 = len(locationDictionary)
+
+        if isfile('./tensor.pkl'):
+            tensor1 = pk.load(open("./tensor.pkl","rb"))
+        else:
+            tensor1 = np.zeros(shape=(len1,len2,len3), dtype=np.int16)
+            for i in range(1,len(useridToNumber.keys())+1):
+                for j in range(1,len(imageidToNumber.keys())+1):
+                    for m in range(1,len(locationDictionary.keys())+1):
+                        print(i,j,m)
+                        tensor1[i-1][j-1][m-1] = len(list(set(userDictionary[useridToNumber[i]]) & set(imageDictionary[imageidToNumber[j]]) & set(locationDictionary[m])))
+
+            pk.dump(tensor1,open("tensor.pkl", "wb"))
+
+        tensor2 = tl.tensor(tensor1)
+        cp_rank = k
+        factors = parafac(tensor2,rank=cp_rank)
+
+        factor_matrix1 = np.matrix(factors[0])
+        factor_matrix2 = np.matrix(factors[1])
+        factor_matrix3 = np.matrix(factors[2])
+
+        user_matrix = df(factor_matrix1,index=[useridToNumber[i] for i in range(1, len(useridToNumber)+1)],columns = range(1,k+1))
+        user_matrix.to_csv('task7U.csv')
+        image_matrix = df(factor_matrix2,index=[imageidToNumber[i] for i in range(1, len(imageidToNumber)+1)], columns=range(1,k+1))
+        image_matrix.to_csv('task7I.csv')
+        location_matrix = df(factor_matrix3, index=locNames.keys(), columns=range(1, k + 1))
+        location_matrix.to_csv('task7L.csv')
+
+        # data1 = pd.read_csv('task7U.csv', row.names=1)
+        data1 = df.from_csv('task7U.csv',header=0,index_col=0)
+        data1.head()
+
+        kmeans1 = KMeans(n_clusters=k)
+        kmeans1.fit(data1)
+        X = np.array(data1)
+        lables1 = kmeans1.labels_
+        userDefDict = defaultdict(list)
+        for i in range(1, len(useridToNumber)+1):
+            templist = userDefDict[lables1[i-1]]
+            templist.append(useridToNumber[i])
+            userDefDict[lables1[i-1]] = templist
+        # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
+        fout = "task7UserGroups.txt"
+        fo = open(fout,"w")
+        for k, v in userDefDict.items():
+            fo.write(str(k) + ':' + str(v) + '\n\n')
+        fo.close()
+
+        # for i in listzip1:
+        #     print(i)
+        # cluser_pred1 = kmeans1.predict(X)
+        # plt.scatter(X[:,0],X[:,1],c=cluser_pred1,s=20,cmap='viridis')
+        # plt.savefig('Task7 User-Plot.pdf')
+
+        data2 = df.from_csv('task7I.csv', header=0, index_col=0)
+        data2.head()
+
+        kmeans2 = KMeans(n_clusters=k,max_iter=80)
+        kmeans2.fit(data2)
+        Y = np.array(data2)
+        lables2 = kmeans2.labels_
+        # listzip2 = [(imageidToNumber[i], "group " + str(lables2[i - 1])) for i in range(1, len(imageidToNumber) + 1)]
+        imageDefDict = defaultdict(list)
+        for i in range(1, len(imageidToNumber) + 1):
+            templist = imageDefDict[lables2[i - 1]]
+            templist.append(imageidToNumber[i])
+            imageDefDict[lables2[i - 1]] = templist
+        # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
+        fout = "task7ImageGroups.txt"
+        fo = open(fout, "w")
+        for k, v in imageDefDict.items():
+            fo.write(str(k) + ':' + str(v) + '\n\n')
+        fo.close()
+
+
+        data3 = df.from_csv('task7L.csv', header=0, index_col=0)
+        data3.head()
+
+        kmeans3 = KMeans(n_clusters=k)
+        kmeans3.fit(data3)
+        Z = np.array(data3)
+        lables3 = kmeans3.labels_
+        # listzip3 = [(locidToName[i], "group " + str(lables3[i - 1])) for i in range(1, len(locidToName) + 1)]
+        locationDefDict = defaultdict(list)
+        for i in range(1, len(locidToName) + 1):
+            templist = locationDefDict[lables3[i - 1]]
+            templist.append(locidToName[i])
+            locationDefDict[lables3[i - 1]] = templist
+        # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
+        fout = "task7LocationGroups.txt"
+        fo = open(fout, "w")
+        for k, v in locationDefDict.items():
+            fo.write(str(k) + ':' + str(v) + '\n\n')
+        fo.close()
 
 
     def quit(self, *args):

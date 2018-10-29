@@ -5,6 +5,7 @@ from pandas import DataFrame
 from util import timed
 from functools import wraps
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 
 
@@ -101,6 +102,12 @@ class Decompose():
     @staticmethod
     def decompose_loc(k, method, locationid, database):
         table = database.get_vis_table(locationid=locationid)
+        if method == 'lda':
+            scalar = MinMaxScaler()
+            indexes = table.index
+            cols = table.columns
+            table = scalar.fit_transform(table)
+            table = DataFrame(table, columns=cols, index=indexes)
         reduced, ps = Decompose.switchboard(table, k, method)
         return reduced, ps
 

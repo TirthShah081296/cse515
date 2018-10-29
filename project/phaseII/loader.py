@@ -192,7 +192,7 @@ class Loader():
     def make_database(folder):
 
         db = Database()
-        # p = Pool(processes=3)
+        # p = P ool(processes=3)
         
         # Load location data for associating the id's to the names.
         loc_files = (folder + '/devset_topics.xml', folder + '/poiNameCorrespondences.txt')
