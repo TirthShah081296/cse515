@@ -84,15 +84,16 @@ class DescriptionReader(GenericReader):
         # Strategy - create matrix representation with lists and then put into a new pandas dataframe.
         table = {}
         with open(file) as f:
-            for line in f:
+            for i, line in enumerate(f):
                 # Tokenize
                 tokens = line.split(' ')
-                tokens.remove('\n')
+                if '\n' in tokens:
+                    tokens.remove('\n')
                 # Find out how many tokens make up the ID
-                for i, token in enumerate(tokens):
+                for k, token in enumerate(tokens):
                     if '"' in token:
                         # This is our first term. Return our index to get the id.
-                        j = i
+                        j = k
                         break
                 an_id = ' '.join(tokens[0: j])
                 # convert to an int if possible
@@ -103,9 +104,12 @@ class DescriptionReader(GenericReader):
 
                 table[an_id] = {}
 
-                for i in range(j,len(tokens), 4):
-                    term, tf, idf, tfidf = tokens[i : i+4]
+                for k in range(j,len(tokens), 4):
+                    four_tuple = tokens[k : k + 4]
+                    term, tf, idf, tfidf = four_tuple
                     term = term.replace('\"', '')
+                    # if 'User' in file and i == 784 and term[0] == 'x':
+                    #     print(four_tuple)
                     table[an_id][term] = idf # At TAs Recommendation I chose one of these models arbitrarily.
 
         return table
@@ -208,7 +212,7 @@ class Loader():
         db.add_txt_descriptors(descs)
         
         # Load visual description data.
-        files = VisualDescriptionReader().load_folder(folder + '/descvis/img')
+        files = VisualDescriptionReader().load_folder(folder + '/descvis/')
         db.add_visual_descriptors(files)
 
         return db
