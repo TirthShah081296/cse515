@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from operator import itemgetter
 from util import timed
 from collections import defaultdict
+import collections
 from tensorly.decomposition import parafac
 import tensorly as tl
 from sklearn.cluster import KMeans
@@ -484,21 +485,19 @@ class Interface():
 
         uflag = 1
         utermlist = list()
-        uturnon = 0
         ucurrent_id = ""
-        with open(userFile, encoding = 'latin-1') as f:
+        with open(userFile, encoding='latin-1') as f:
             for line in f:
                 for word in line.split():
                     if uflag == 1:
-                        if not word.startswith('"'):
-                            if uturnon:
-                                userDictionary[ucurrent_id] = utermlist
-                                utermlist.clear()
-                            ucurrent_id = word
-                            uturnon = 1
+                        if word.startswith('"'):
+                            utermlist.append(word)
+                            userDictionary[ucurrent_id] = utermlist
+                            uflag = 2
                             continue
-                        utermlist.append(word)
-                        uflag = 2
+
+                        ucurrent_id = word
+                        utermlist = []
                         continue
                     if uflag == 2:
                         uflag = 3
@@ -509,24 +508,20 @@ class Interface():
                     if uflag == 4:
                         uflag = 1
                         continue
-        userDictionary[ucurrent_id] = utermlist
 
         iflag = 1
         itermlist = list()
-        iturnon = 0
         icurrent_id = ""
         with open(imageFile, encoding='latin-1') as f:
             for line in f:
                 for word in line.split():
                     if iflag == 1:
                         if not word.startswith('"'):
-                            if iturnon:
-                                imageDictionary[icurrent_id] = itermlist
-                                itermlist.clear()
                             icurrent_id = word
-                            iturnon = 1
+                            itermlist = []
                             continue
                         itermlist.append(word)
+                        imageDictionary[icurrent_id] = itermlist
                         iflag = 2
                         continue
                     if iflag == 2:
@@ -538,18 +533,21 @@ class Interface():
                     if iflag == 4:
                         iflag = 1
                         continue
-        imageDictionary[icurrent_id] = itermlist
+        # imageDictionary[icurrent_id] = itermlist
+        # print(userDictionary)
+        # print(len(imageDictionary.keys()))
+        # print(len(userDictionary.keys()))
 
         locNames = dict()
+        locidToName = dict()
         tree = ET.parse('./devset_topics.xml')
         root = tree.getroot()
         for elem1 in root:
-            locNames[elem1[1].text] = int(elem1[0].text)
+            locNames[elem1[1].text] = int(elem1[0].text)  # Key: Location Name, Value: Location Ids
+            locidToName[int(elem1[0].text)] = elem1[1].text  # Key: Location Ids, Value: Location Name
 
-        # print (locNames)
         lflag = 1
         ltermlist = list()
-        lturnon = 0
         lcurrent_id = ""
         with open(locationFile, encoding='utf8') as f:
             for line in f:
@@ -557,53 +555,30 @@ class Interface():
                     if lflag == 1:
                         if word.startswith('"'):
                             ltermlist.append(word)
-                            # current_term = word
+                            locationDictionary[lcurrent_id] = ltermlist
                             lflag = 2
                             continue
-                        if lturnon:
-                            locationDictionary[lcurrent_id] = ltermlist
-                            ltermlist.clear()
                         lcurrent_id = locNames[word]
-                        lturnon = 1
-                        # idlist.append(current_id)
-                        # if turnon == 1:
-                        #     turnon = 0
-                        # else:
-                        #     if current_id == int(sys.argv[1]):
-                        #         turnon = 1
+                        ltermlist = []
                         lflag = 5
                         continue
                     elif lflag == 2:
-                        # tflist.append(word)
-                        # main_dict[(current_id, current_term, 'TF')] = float(word)
                         lflag = 3
                         continue
                     elif lflag == 3:
-                        # dflist.append(word)
-                        # main_dict[(current_id, current_term, 'DF')] = float(word)
                         lflag = 4
                         continue
                     elif lflag == 4:
-                        # idflist.append(word)
-                        # print current_id, current_term
-                        # main_dict[(current_id, current_term, 'TF-IDF')] = float(word)
                         lflag = 1
                         continue
                     elif lflag == 5:
                         if word.startswith('"'):
                             ltermlist.append(word)
-                            # if turnon == 1:
-                            #     reqTermList.append(word)
-                            # current_term = word
+                            locationDictionary[lcurrent_id] = ltermlist
                             lflag = 2
                             continue
                         continue
-        locationDictionary[lcurrent_id] = ltermlist
-
-        # print(len(locationDictionary))
-        # print(len(userDictionary))
-        # print(len(imageDictionary))
-
+        # locationDictionary[lcurrent_id] = ltermlist
         # At this point the dictionaries have a list of terms for each ids
 
         # At this point the dictionaries have a list of terms for each ids
