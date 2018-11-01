@@ -166,6 +166,8 @@ class Decompose():
     @staticmethod
     def lda2(table, k):
         indexes = table.index
+        scalar = MinMaxScaler()
+        table = scalar.fit_transform(table)
         matrix = LDA(n_components=k)
         out = matrix.fit_transform(table)
         return DataFrame(data=out, index=indexes, columns=range(k))
@@ -226,6 +228,8 @@ class Decompose():
         :return DataFrame reduced matrix.
         """
         indexes = table.index
+        scalar = MinMaxScaler()
+        table = scalar.fit_transform(table)
         matrix = LDA(n_components=k)
         out = matrix.fit_transform(table)
         temp = np.array(matrix.components_, dtype=float)

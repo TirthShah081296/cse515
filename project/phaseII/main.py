@@ -12,39 +12,50 @@ import xml.etree.ElementTree as ET
 from operator import itemgetter
 from util import timed
 from collections import defaultdict
+import collections
 from tensorly.decomposition import parafac
 import tensorly as tl
 from sklearn.cluster import KMeans
-# import matplotlib.pyplot as plt
 import _pickle as pk
+
+
+
+# CHANGES SINCE SUBMISSION
+#   ADDED MinMaxScalar to all LDA algs.
+#   Changed tensor algorithm to account for change in location count.
+#   Changed load algorithm to handle unexpected newlines present in the demo data.
 
 
 class Interface():
 
-    def __init__(self):
+    def __init__(self, demo_load=False):
         self.__database__ = None
         self.__valid_types__ = ['photo', 'user', 'poi']
         self.__vis_models__ = ['CM', 'CM3x3', 'CN', 'CN3x3',
                 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
-        self.__io__()
-
+        if not demo_load:
+            self.__io__()
+        else:
+            self.run_1_2()
     
 
-    def __print_latent_semantics__(self, table, save=True):
+    def __latent_semantic_string__(self, table, save=True):
         """
         Pretty prints out the latent semantics.
         :param DataFrame table: The latent semantic vectors. Columns are individual vectors, rows are features.
         """
         table = table.T
+        to_return = ""
         if save:
             table.to_csv('latent_semantics.csv') # For easy reference to teacher
         for i, col_id in enumerate(table):
             column = table[col_id]
             column = column.sort_values(ascending=False)
-            print('-'*50)
-            print("LATENT SEMANTIC " + str(i))
-            print('-'*50)
-            print(column)
+            to_return += '-' * 50
+            to_return += "\nLATENT SEMANTIC " + str(i)
+            to_return += '-' * 50
+            to_return += column.__repr__()
+        return to_return
 
 
 
@@ -147,7 +158,8 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         _, latent_semantics = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
-        self.__print_latent_semantics__(latent_semantics)
+        string = self.__latent_semantic_string__(latent_semantics)
+        return string
 
 
 
@@ -190,12 +202,16 @@ class Interface():
             print("[ERROR] One or more arguments could not be parsed: " + str(args))
 
         reduced_table, latent_semantics = Decompose.decompose_text(term_space, k, method.lower(), self.__database__)
-        self.__print_latent_semantics__(latent_semantics)
+        ls_str = self.__latent_semantic_string__(latent_semantics)
+        print(ls_str)
         vector = reduced_table.loc[anid]
         neighbors = Neighbor.knn(j, vector, reduced_table)
-        print("NEIGHBORS to " + str(anid))
+        neighbors_str = ""
+        neighbors_str += "NEIGHBORS to " + str(anid)
         for i, neighbor in enumerate(neighbors):
-            print(f"{i}: ID = {neighbor.id}, DIST = {neighbor.dist}")
+            neighbors_str += f"{i}: ID = {neighbor.id}, DIST = {neighbor.dist}"
+        print(neighbors_str)
+        return ls_str + '\n' + neighbors_str
 
 
 
@@ -244,18 +260,21 @@ class Interface():
         vector1 = []
         for i in range(k):
             vector1.append(vector[i])
-        print("5 nearest images to " + args[3] + " are:")
+        nearest_img = "5 nearest images to " + str(args[3]) + " are:\n"
         nearest = Neighbor.knn_dot(5, vector1, matrix)
-        print("IMAGE ID\t\tSCORE")
+        nearest_img += "IMAGE ID\t\tSCORE\n"
         for values in nearest:
-            print(str(values[1]) + "\t\t" + str(values[0]))
+            nearest_img += str(values[1]) + "\t\t" + str(values[0]) + '\n'
+        print(nearest_img)
 
         # Get nearest locations from latent semantics.
-        print("5 nearest locations to " + args[3] + " are:")
+        nearest_loc = "5 nearest locations to " + str(args[3]) + " are:"
         nearest = Neighbor.knn_loc(5, vector1, vis_model, k, method, self.__database__)
-        print("LOCATION ID\t\tSCORE")
+        nearest_loc += "LOCATION ID\t\tSCORE"
         for values in nearest:
-            print(str(values[1]) + "\t\t\t" + str(values[0]))
+            nearest_loc += str(values[1]) + "\t\t\t" + str(values[0]) + "\n"
+        print(nearest_loc)
+        return nearest_img + '\n\n' + nearest_loc
 
 
     def task4(self, *args):
@@ -297,10 +316,12 @@ class Interface():
         # Get nearest 5 locations from latent semantics. Neighbor.knn may be useful for you.
 
         nearest = Neighbor.knn_vd(5, matrix, vis_model, k, method, locationid, self.__database__)
-        print("5 nearest locations to " + args[0] + " are:")
-        print("LOCATION ID\t\tSCORE")
+        nearest_loc = "5 nearest locations to " + str(args[0]) + " are:\n"
+        nearest_loc += "LOCATION ID\t\tSCORE\n"
         for values in nearest:
-            print(str(values[1]) + "\t\t\t" + str(values[0]))
+            nearest_loc += str(values[1]) + "\t\t\t" + str(values[0]) + '\n'
+        print(nearest_loc)
+        return nearest_loc
 
 
     def task5(self, *args):
@@ -337,10 +358,10 @@ class Interface():
         # WRITE CODE IN THESE FUNCTIONS #####################################################
         reduced_table, latent_semantics = Decompose.decompose_loc(k, method, locationid, self.__database__) # Get latent semantics.
         # reduced_table.to_csv('Image-semantic_task5.csv')
-        self.__print_latent_semantics__(latent_semantics)
+        self.__latent_semantic_string__(latent_semantics)
         reducedLocations = dict()  # A dictionary that has locationid as the key and the reduced tables as the values.
         similarityScore = dict()
-        for i in range(1,31):
+        for i in range(1,36):
             if i == locationid:
                 reducedLocations[i] = reduced_table
             else:
@@ -389,24 +410,24 @@ class Interface():
 
         # IMP NOTE: Remember to change all the static values after the test data arrives.
         all_location_tables = dict()
-        for id in range(1,31):
+        for id in range(1,36):
             all_location_tables[id] = Database.get_vis_table(self.__database__,locationid=id)
         # Start finding the similarity between each pair of locations and store the results into a dictionary.
         if isfile('./all_similarities.npy'):
             all_similarities = np.load('all_similarities.npy').item()
         else:
             all_similarities = dict()
-            for i in range(1,31):
-                for j in range(i,31):
+            for i in range(1,36):
+                for j in range(i,36):
                     cos_sim = cosine_similarity(all_location_tables[i], all_location_tables[j])
                     all_similarities[(i, j)] = Scoring.score_matrix(cos_sim)
                     all_similarities[(j, i)] = all_similarities[(i, j)]
             np.save('all_similarities.npy', all_similarities)
 
-        similarity_matrix = df(index=range(1,31),columns=range(1,31))
-        for i in range(1,31):
+        similarity_matrix = df(index=range(1,36),columns=range(1,36))
+        for i in range(1,36):
             sim_list = list()
-            for j in range(1,31):
+            for j in range(1,36):
                 sim_list.append(all_similarities[(i, j)])
             similarity_matrix.loc[i] = sim_list
         similarity_matrix.to_csv('Task6_SimilarityMatrix.csv')
@@ -415,7 +436,7 @@ class Interface():
         reduced = SVD(n_components=k)
         # reduced_table = reduced.fit_transform(similarity_matrix)
         reduced.fit(similarity_matrix)
-        VTranspose = df(data=reduced.components_, index=range(1,k+1),columns=range(1,31))
+        VTranspose = df(data=reduced.components_, index=range(1,k+1),columns=range(1,36))
         VTranspose.to_csv('task6transposetable.csv')
 
         filename = 'devset_topics.xml'
@@ -433,7 +454,7 @@ class Interface():
 
         print("Top k latent semantics in form of their location-weight pair are:")
         for _, row in VTranspose.iterrows():
-            for j in range(1, 31):
+            for j in range(1, 36):
                 loc = location_name[j]
                 location_dict[loc] = row[j]
             sorted_location_dict = sorted(location_dict.items(), key=itemgetter(1), reverse=True)
@@ -461,10 +482,10 @@ class Interface():
             print("[ERROR] Too many arguments were provided. Expected 1 but got " + str(len(args)))
             print("\targs = " + str(args))
             return
-        if not self.__database__:
-            print("[ERROR] The Database must be loaded before this can be run.")
-            print("\tCommand: load <filepath>")
-            return
+        #if not self.__database__:
+        #    print("[ERROR] The Database must be loaded before this can be run.")
+        #    print("\tCommand: load <filepath>")
+        #    return
         
         try:
             k = int(args[0])
@@ -541,10 +562,12 @@ class Interface():
         imageDictionary[icurrent_id] = itermlist
 
         locNames = dict()
+        locidToName = dict()
         tree = ET.parse('./devset_topics.xml')
         root = tree.getroot()
         for elem1 in root:
-            locNames[elem1[1].text] = int(elem1[0].text)
+            locNames[elem1[1].text] = int(elem1[0].text)  # Key: Location Name, Value: Location Ids
+            locidToName[int(elem1[0].text)] = elem1[1].text  # Key: Location Ids, Value: Location Name
 
         # print (locNames)
         lflag = 1
@@ -575,7 +598,7 @@ class Interface():
                         continue
                     elif lflag == 2:
                         # tflist.append(word)
-                        # main_dict[(current_id, current_term, 'TF')] = float(word)
+                        # main_dict[(current_id, current_term, 'TF')] = word)
                         lflag = 3
                         continue
                     elif lflag == 3:
@@ -599,12 +622,6 @@ class Interface():
                             continue
                         continue
         locationDictionary[lcurrent_id] = ltermlist
-
-        # print(len(locationDictionary))
-        # print(len(userDictionary))
-        # print(len(imageDictionary))
-
-        # At this point the dictionaries have a list of terms for each ids
 
         # At this point the dictionaries have a list of terms for each ids
 
@@ -672,15 +689,9 @@ class Interface():
         # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
         fout = "task7UserGroups.txt"
         fo = open(fout,"w")
-        for k, v in userDefDict.items():
-            fo.write(str(k) + ':' + str(v) + '\n\n')
+        for key, v in userDefDict.items():
+            fo.write(str(key) + ':' + str(v) + '\n\n')
         fo.close()
-
-        # for i in listzip1:
-        #     print(i)
-        # cluser_pred1 = kmeans1.predict(X)
-        # plt.scatter(X[:,0],X[:,1],c=cluser_pred1,s=20,cmap='viridis')
-        # plt.savefig('Task7 User-Plot.pdf')
 
         data2 = df.from_csv('task7I.csv', header=0, index_col=0)
         data2.head()
@@ -698,8 +709,8 @@ class Interface():
         # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
         fout = "task7ImageGroups.txt"
         fo = open(fout, "w")
-        for k, v in imageDefDict.items():
-            fo.write(str(k) + ':' + str(v) + '\n\n')
+        for key, v in imageDefDict.items():
+            fo.write(str(key) + ':' + str(v) + '\n\n')
         fo.close()
 
 
@@ -712,6 +723,7 @@ class Interface():
         lables3 = kmeans3.labels_
         # listzip3 = [(locidToName[i], "group " + str(lables3[i - 1])) for i in range(1, len(locidToName) + 1)]
         locationDefDict = defaultdict(list)
+        locidToName = defaultdict()
         for i in range(1, len(locidToName) + 1):
             templist = locationDefDict[lables3[i - 1]]
             templist.append(locidToName[i])
@@ -719,8 +731,8 @@ class Interface():
         # listzip1 = [(useridToNumber[i],"group " + str(lables1[i-1])) for i in range(1,len(useridToNumber)+1)]
         fout = "task7LocationGroups.txt"
         fo = open(fout, "w")
-        for k, v in locationDefDict.items():
-            fo.write(str(k) + ':' + str(v) + '\n\n')
+        for key, v in locationDefDict.items():
+            fo.write(str(key) + ':' + str(v) + '\n\n')
         fo.close()
 
 
@@ -730,6 +742,38 @@ class Interface():
         Description:\tExits the program and performs necessary cleanup.
         """
         exit(1)
+
+
+    def run_1_2(self):
+        subdir = 'demo/'
+        self.load('/home/crosleyzack/school/fall18/cse515/repo/project/phaseII/phase2_testdata/devset')
+        for space, current_id in zip(['photo', 'user', 'poi'], [9636162061, '15394372@N00', 10]):
+            for method in ['pca', 'lda', 'svd']:
+                k = 8
+                string = f"{space}_{k}_{method}"
+                print(f"Loading {string}")
+                lsm = self.task1(space, k, method)
+                nearest = self.task2(space,k, method, k, current_id)
+                task1_file_name = subdir + f"t1_{string}.txt"
+                task2_file_name = subdir + f"t2_{string}_{current_id}.txt"
+                with open(task1_file_name, 'w+') as f:
+                    f.write(lsm)
+                with open(task2_file_name, 'w+') as f:
+                    f.write(nearest)
+                
+                for visual_model in ['CM']:#, 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']:
+                    out_3 = self.task3(visual_model, k, method, 5, current_id)
+                    file_3 = subdir + f"t3_{visual_model}_{k}_{method}_{current_id}.txt"
+                    with open(file_3, 'w+') as f:
+                        f.write(out_3)
+                    # <locationid> <vis model> <k> <method>
+                    for location in range(1,36):
+                        task4_filename = subdir + f"t4_{location}_{visual_model}_{k}_{method}.txt"
+                        if not isfile(task4_filename):
+                            out_4 = self.task4(location, visual_model, k, method)
+                            with open(task4_filename, 'w+') as f:
+                                f.write(out_4)
+
 
 if __name__ == '__main__':
     Interface()
