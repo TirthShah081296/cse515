@@ -37,7 +37,7 @@ class Interface():
             self.__io__()
         else:
             self.run_1_2()
-    
+
 
     def __latent_semantic_string__(self, table, save=True):
         """
@@ -45,7 +45,7 @@ class Interface():
         :param DataFrame table: The latent semantic vectors. Columns are individual vectors, rows are features.
         """
         table = table.T
-        to_return = ""
+
         if save:
             table.to_csv('latent_semantics.csv') # For easy reference to teacher
         for i, col_id in enumerate(table):
@@ -67,13 +67,13 @@ class Interface():
             user_input = user_input.split(' ')
             command = user_input[0]
             command.replace('_', '')
-            # Get method with this name - makes it easy to create new interface methods 
+            # Get method with this name - makes it easy to create new interface methods
             #   without having to edit this method.
             try:
                 method = getattr(self, command)
             except AttributeError:
                 print('The command specified was not a valid command.\n')
-            
+
             try:
                 method(*user_input[1:])
             except Exception as e:
@@ -93,7 +93,7 @@ class Interface():
             if not item.startswith('__'):
                 method = getattr(self, item)
                 print(method.__doc__)
-        
+
 
 
     # takes a single argument - file to load.
@@ -113,13 +113,13 @@ class Interface():
             print("[ERROR] Too many args given to load parameter.")
             print("\targs = " + str(args))
             return
-        
+
         folder = abspath(args[0])
 
         if not isdir(folder):
             print("[ERROR] The provided path was not a folder, and therefore not a valid data directory.")
             return
-        
+
         self.__database__ = Loader.make_database(folder)
         print("Database loaded successfully.")
 
@@ -149,7 +149,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             term_space = args[0]
             k = int(args[1])
@@ -189,7 +189,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             term_space = args[0]
             k = int(args[1])
@@ -242,7 +242,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             vis_model = args[0]
             k = int(args[1])
@@ -301,7 +301,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             locationid = int(args[0])
             vis_model = args[1]
@@ -347,7 +347,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             locationid = int(args[0])
             k = int(args[1])
@@ -378,7 +378,7 @@ class Interface():
         print("The most related 5 locations are:")
         for i in range(5):
             print("Id: ", orderedSimilarityList[i], "Score: ", similarityScore[orderedSimilarityList[i]])
-    
+
 
     def task6(self, *args):
         """
@@ -400,7 +400,7 @@ class Interface():
             print("[ERROR] The Database must be loaded before this can be run.")
             print("\tCommand: load <filepath>")
             return
-        
+
         try:
             k = int(args[0])
         except:
@@ -462,7 +462,7 @@ class Interface():
             # print("latent semantic " + str(index) + " : " + str(sorted_location_dict))
             print(f"LATENT SEMANTIC {i}")
             for key, value in sorted_location_dict:
-                print(f"{key} : {value}")            
+                print(f"{key} : {value}")
 
 
     def task7(self, *args):
@@ -486,7 +486,7 @@ class Interface():
         #    print("[ERROR] The Database must be loaded before this can be run.")
         #    print("\tCommand: load <filepath>")
         #    return
-        
+
         try:
             k = int(args[0])
         except:
@@ -505,21 +505,19 @@ class Interface():
 
         uflag = 1
         utermlist = list()
-        uturnon = 0
         ucurrent_id = ""
-        with open(userFile, encoding = 'latin-1') as f:
+        with open(userFile, encoding='latin-1') as f:
             for line in f:
                 for word in line.split():
                     if uflag == 1:
-                        if not word.startswith('"'):
-                            if uturnon:
-                                userDictionary[ucurrent_id] = utermlist
-                                utermlist.clear()
-                            ucurrent_id = word
-                            uturnon = 1
+                        if word.startswith('"'):
+                            utermlist.append(word)
+                            userDictionary[ucurrent_id] = utermlist
+                            uflag = 2
                             continue
-                        utermlist.append(word)
-                        uflag = 2
+
+                        ucurrent_id = word
+                        utermlist = []
                         continue
                     if uflag == 2:
                         uflag = 3
@@ -530,24 +528,20 @@ class Interface():
                     if uflag == 4:
                         uflag = 1
                         continue
-        userDictionary[ucurrent_id] = utermlist
 
         iflag = 1
         itermlist = list()
-        iturnon = 0
         icurrent_id = ""
         with open(imageFile, encoding='latin-1') as f:
             for line in f:
                 for word in line.split():
                     if iflag == 1:
                         if not word.startswith('"'):
-                            if iturnon:
-                                imageDictionary[icurrent_id] = itermlist
-                                itermlist.clear()
                             icurrent_id = word
-                            iturnon = 1
+                            itermlist = []
                             continue
                         itermlist.append(word)
+                        imageDictionary[icurrent_id] = itermlist
                         iflag = 2
                         continue
                     if iflag == 2:
@@ -559,7 +553,10 @@ class Interface():
                     if iflag == 4:
                         iflag = 1
                         continue
-        imageDictionary[icurrent_id] = itermlist
+        # imageDictionary[icurrent_id] = itermlist
+        # print(userDictionary)
+        # print(len(imageDictionary.keys()))
+        # print(len(userDictionary.keys()))
 
         locNames = dict()
         locidToName = dict()
@@ -569,10 +566,8 @@ class Interface():
             locNames[elem1[1].text] = int(elem1[0].text)  # Key: Location Name, Value: Location Ids
             locidToName[int(elem1[0].text)] = elem1[1].text  # Key: Location Ids, Value: Location Name
 
-        # print (locNames)
         lflag = 1
         ltermlist = list()
-        lturnon = 0
         lcurrent_id = ""
         with open(locationFile, encoding='utf8') as f:
             for line in f:
@@ -580,47 +575,30 @@ class Interface():
                     if lflag == 1:
                         if word.startswith('"'):
                             ltermlist.append(word)
-                            # current_term = word
+                            locationDictionary[lcurrent_id] = ltermlist
                             lflag = 2
                             continue
-                        if lturnon:
-                            locationDictionary[lcurrent_id] = ltermlist
-                            ltermlist.clear()
                         lcurrent_id = locNames[word]
-                        lturnon = 1
-                        # idlist.append(current_id)
-                        # if turnon == 1:
-                        #     turnon = 0
-                        # else:
-                        #     if current_id == int(sys.argv[1]):
-                        #         turnon = 1
+                        ltermlist = []
                         lflag = 5
                         continue
                     elif lflag == 2:
-                        # tflist.append(word)
-                        # main_dict[(current_id, current_term, 'TF')] = word)
                         lflag = 3
                         continue
                     elif lflag == 3:
-                        # dflist.append(word)
-                        # main_dict[(current_id, current_term, 'DF')] = float(word)
                         lflag = 4
                         continue
                     elif lflag == 4:
-                        # idflist.append(word)
-                        # print current_id, current_term
-                        # main_dict[(current_id, current_term, 'TF-IDF')] = float(word)
                         lflag = 1
                         continue
                     elif lflag == 5:
                         if word.startswith('"'):
                             ltermlist.append(word)
-                            # if turnon == 1:
-                            #     reqTermList.append(word)
-                            # current_term = word
+                            locationDictionary[lcurrent_id] = ltermlist
                             lflag = 2
                             continue
                         continue
+
         locationDictionary[lcurrent_id] = ltermlist
 
         # At this point the dictionaries have a list of terms for each ids
@@ -760,7 +738,7 @@ class Interface():
                     f.write(lsm)
                 with open(task2_file_name, 'w+') as f:
                     f.write(nearest)
-                
+
                 for visual_model in ['CM']:#, 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']:
                     out_3 = self.task3(visual_model, k, method, 5, current_id)
                     file_3 = subdir + f"t3_{visual_model}_{k}_{method}_{current_id}.txt"
