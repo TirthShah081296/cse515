@@ -8,3 +8,5 @@ This code has the following python-library dependencies:
   2. pandas 0.23.4
   3. lxml 4.2.5
   4. scikit-learn 0.20.0
+  5. python-igraph 0.7.1
+  6. pycairo 1.18.0
