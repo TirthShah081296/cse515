@@ -61,64 +61,7 @@ class GenericReader():
         return [folder + '/' + file for file in listdir(folder) if isfile(folder + '/' + file) and not file.startswith('.')]
 
 
-################################################################
-####               TEXT DESCRIPTION LOADER                  ####
-################################################################
-
-# NOTE -  The textual descriptions can be found in the folder Dataset/desctext
-#   Each of them are structured as followed.
-#   ID  "Text Term That Appeared" TF IDF TF-IDF
-#   The ID will be the id of an image, user, or other depending on the
-#       file.
-#
-# Indended to be used by calling load_files. Returns dictionary with keys
-#   'photos', 'users', and 'poi'. Each key points to a pandas dataframe with
-#   the description information for those items.
-class DescriptionReader(GenericReader):
-
-    def __init__(self):
-        self.seen = []
-
-    def load_file(self, file, index):
-        if not isfile(file):
-            raise OSError('Could not parse description file ' + str(file) + ' as it doesn\'t exist')
-        
-        # Strategy - create matrix representation with lists and then put into a new pandas dataframe.
-        table = {}
-        with open(file) as f:
-            for i, line in enumerate(f):
-                # Tokenize
-                tokens = line.split(' ')
-                if '\n' in tokens:
-                    tokens.remove('\n')
-                # Find out how many tokens make up the ID
-                for k, token in enumerate(tokens):
-                    if '"' in token:
-                        # This is our first term. Return our index to get the id.
-                        j = k
-                        break
-                an_id = ' '.join(tokens[0: j])
-                # convert to an int if possible
-                try:
-                    an_id = int(an_id)
-                except:
-                    pass
-
-                table[an_id] = {}
-
-                for k in range(j,len(tokens), 4):
-                    four_tuple = tokens[k : k + 4]
-                    term, tf, idf, tfidf = four_tuple
-                    term = term.replace('\"', '')
-                    # if 'User' in file and i == 784 and term[0] == 'x':
-                    #     print(four_tuple)
-                    table[an_id][term] = idf # At TAs Recommendation I chose one of these models arbitrarily.
-
-        return table
-
-
-
-################################################################
+#################################################################
 ####                    LOCATION DATA                       ####
 ################################################################
 
@@ -204,14 +147,6 @@ class Loader():
         loc_files = (folder + '/devset_topics.xml', folder + '/poiNameCorrespondences.txt')
         location_dict = LocationReader().load_files(*loc_files)
         db.add_locations(location_dict)
-        
-        # Load text description data.
-        text_files = [folder + '/desctxt/devset_textTermsPerPOI.txt',
-                      folder + '/desctxt/devset_textTermsPerImage.txt',
-                      folder + '/desctxt/devset_textTermsPerUser.txt']
-        types = ['poi', 'photo', 'user']
-        descs = DescriptionReader().load_files(text_files,types)
-        db.add_txt_descriptors(descs)
         
         # Load visual description data.
         files = VisualDescriptionReader().load_folder(folder + '/descvis/img/')
