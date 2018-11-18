@@ -2,7 +2,7 @@
 from loader import Loader
 from distance import Similarity
 from graph import Graph
-from os.path import abspath, isdir
+from os.path import abspath, isdir, isfile
 import argparse
 from util import timed
 
@@ -29,22 +29,40 @@ class Interface():
                 return True
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('-task', type=int, choices=range(1,6), required=True, metavar='#')
+        parser.add_argument('-task', type=int, choices=range(1,7), required=True, metavar='#')
         parser.add_argument('--k', type=int, metavar='#')
-        parser.add_argument('--visualize', action='store_true', default=True)
+        parser.add_argument('--alg', type=str, metavar="algorithm_to_use")
+        parser.add_argument('--imgs', type=int, nargs='+', metavar='img1 img2 ...')
         parser.add_argument('--load', type=str, metavar='filepath')
+        parser.add_argument('--graph', type=str, metavar='filename')
         parser.add_argument('--layers', type=int, metavar='L')
         parser.add_argument('--hashes', type=int, metavar='k')
-        parser.add_argument('--cluster', type=int, metavar='c')
-        parser.add_argument('--vectors', type=list) # Not sure how this works still.
+        # parser.add_argument('--cluster', type=int, metavar='c')
+        parser.add_argument('--vectors', type=str) #Assuming this is a file locaiton 
         while True:
             user_input = input("\nEnter a Command:$ ")
             user_input = user_input.split(' ')
-            args = parser.parse_args(user_input)
+            try:
+                args = parser.parse_args(user_input)
+            except Exception as e:
+                print("The command line input could not be parsed.")
+                print(e)
 
-            # call load if indicated in the command.
+            # load the database from the folder.
             if args.load:
-                self.load(args)
+                try:
+                    self.load(args)
+                except Exception as e:
+                    print('Something went wrong during database load.')
+                    print(e)
+
+            # load the graph from the file.
+            if args.graph:
+                try:
+                    self.graph(args)
+                except Exception as e:
+                    print('Something went wrong loading the graph.')
+                    print(e)
 
             # Get method with this name - makes it easy to create new interface methods 
             #   without having to edit this method.
@@ -74,11 +92,9 @@ class Interface():
                 print(method.__doc__)
         
 
-
-    # takes a single argument - file to load.
     def load(self, args):
         """
-        Command:\tload <filepath>
+        Command:\t--load <filepath>
         Description:\tLoads the database at that file path. If the file does not exist, will prompt to create a new database using the folder of a users choice.
         Arguments:
         \t<filepath> - A valid file path in the system.
@@ -92,6 +108,24 @@ class Interface():
         
         self.__database__ = Loader.make_database(folder)
         print("Database loaded successfully.")
+    
+
+
+    def graph(self, args):
+        """
+        Command:\t--graph <filepath>
+        Description:\tLoads the graph from the binary (pickle file) specified.
+        Arguments:
+        \t<filepath> a valid file path in the system.
+        """
+        f = abspath(args.graph)
+
+        if not isfile(f):
+            print("[ERROR] The provided path was not a valid file.")
+            return
+        
+        self.__graph__ = Graph.load(f)
+        print('Graph loaded successfully.')
 
 
 
@@ -99,17 +133,66 @@ class Interface():
     def task1(self, args):
         if args.k == None:
             raise ValueError('Parameter K must be defined for task 1.')
-        if args.load:
-            all_photos = self.__database__.get_vis_table()
-            print("All Photos w/ all models collected.")
-            similarity = Similarity.cosine_similarity(all_photos, all_photos)
-            print("Similarity matrix created.")
-            self.__graph__ = Graph(similarity=similarity)
-            print("Graph loaded.")
-            self.__graph__.save('graph.pickle')
-        # Get subgraph
         k = int(args.k)
+        if self.__graph__ == None:
+            self.__graph__ = Loader.make_graphs(self.__database__, k)
         # visualize graph.
+        self.__graph__.display()
+    
+
+
+    def task2(self, args):
+        if args.k == None or args.alg == None:
+            raise ValueError('K and Alg must be defined for task 2.')
+        c = int(args.k)
+        alg = args.alg
+
+        #YOUR CODE HERE.
+
+
+
+    def task3(self, args):
+        if args.k == None:
+            raise ValueError('K must be defined for task 3.')
+        k = int(args.k)
+
+        # YOUR CODE HERE.
+    
+
+
+    def task4(self, args):
+        if args.k == None or args.imgs == None:
+            raise ValueError('K and Imgs must be defined for task 4.')
+        k = int(args.k)
+        imgs = list(args.imgs)
+    
+        # YOUR CODE HERE.
+
+
+    
+    def task5(self, args):
+        if args.layers == None or args.hashes == None \
+            or args.vectors == None or args.k == None \
+            or args.imgs == None:
+            raise ValueError('Layers, Hashes, Vectors, K, and IMG must all be defined for task 5.')
+        layers = int(args.layers)
+        hashes = int(args.hashes)
+        vectors = str(args.vectors)
+        t = int(args.k)
+        imgs = list(args.imgs)
+    
+        # YOUR CODE HERE
+    
+
+
+    def task6(self, args):
+        if args.alg == None:
+            raise ValueError('Alg must be defined for task 6.')
+        
+        alg = str(args.alg)
+
+        # YOUR CODE HERE
+
 
 
     def quit(self, *args):

@@ -6,6 +6,9 @@ from os.path import isfile
 from util import timed
 from functools import wraps
 import pickle
+from collections import defaultdict
+import pandas as pd
+from distance import Similarity
 
 
 class Edge():
@@ -136,6 +139,9 @@ class Graph():
         Adds edges from an iterable
         :param list edges: List of Edge objects.
         """
+        if not isinstance(edges, list):
+            raise ValueError('Edges parameter should be a list of edge objects.')
+        
         new_edges = [(edge.start, edge.end) for edge in edges]
         weights = [edge.weight for edge in edges]
         self.__add_edges__(new_edges, weights)
@@ -146,6 +152,9 @@ class Graph():
         Add vertices to graph by name.
         :param list vertices: list of vertice names (can be any basic datatype)
         """
+        if not isinstance(vertices, list):
+            raise ValueError('Vertices parameters should be a list of names.')
+
         for vertex in vertices:
             self.__graph__.add_vertex(name=vertex, cluster=None)
 
@@ -159,28 +168,51 @@ class Graph():
         """
         assert(all(similarity.index == similarity.columns))
         # TODO photo too large for C int, breaks igraph lib.
-        photos = similarity.index
+        photos = list(similarity.index)
         self.add_vertices(photos)
         # get the nearest neighbors similarity wise to each image and add to database.
-        for photo in photos:
+        for i, photo in enumerate(photos):
+            print(str(i))
             photo = int(photo)
             row = similarity.loc[photo].sort_values(ascending=False)
             edges = [(photo, int(other)) for other in row.index]
             weights = [other for other in row]
             self.__add_edges__(edges, weights)
         return
+    
+
+    @timed
+    def add_edge_dict(self, edge_dict):
+        """
+        initializes graph from similarity matrix.
+        :param Pandas.Dataframe similarity:
+        """
+        nodes = list(edge_dict.keys())
+        # form edges.
+        edges = list()
+        weights = list()
+        for node in nodes:
+            edges.extend([(node, other) for other in edge_dict[node]])
+            weights.extend([edge_dict[node][other] for other in edge_dict[node]])
+        self.add_vertices(nodes)
+        self.__add_edges__(edges, weights)
+        return
+
 
     
     def node(self, name):
         """
-        Get node by name
+        Get node by name. In this application, it is the image id.
+        :param obj name: Name of node to retrieve.
         """
         return self.__get_node_by_name__(name)
         
 
     def edge(self, src, end):
         """
-        Get edge interface object between two nodes.
+        Get edge interface object between two nodes. Used to find weight of edge if it exists.
+        ;param obj src: Name of start node, or tail.
+        :param obj end: Name of end node, or head.
         """
         e = self.__find_edge__(src, end)
         if e:
@@ -191,6 +223,7 @@ class Graph():
 
     def subgraph(self, out_degree):
         """
+        NOTE: Untested!
         Returns a subgraph of the main graph with max out degree of k.
         When removing edges it keeps the largest k.
         :param int out_degree: number of out edges for each vertex.
@@ -234,7 +267,9 @@ class Graph():
     
     def add_to_cluster(self, node, cluster):
         """
-        Adds cluster label to the node.
+        Adds cluster label to the node. NOTE: If node is already in a cluster, this will be
+            overwritten in teh graph itself for display. The previous cluster will be restored
+            when the node is removed from the new cluster.
         :param int node: node id to add label to.
         :param str cluster: cluster identifier to add to node.
         """
@@ -254,7 +289,8 @@ class Graph():
 
     def remove_from_cluster(self, node, cluster):
         """
-        Removes node from cluster.
+        Removes node from cluster. This sets the cluster in the graph to another cluster if the node
+            belongs to a second one, or None otherwise.
         :param int node: node id to add label to.
         :param str cluster: cluster identifier to remove from.
         """
@@ -276,34 +312,40 @@ class Graph():
         self.__add_label__(node, Graph.CLUSTER, c)
     
 
-    def display(self, graph=None, clusters=[], filename='out.png'):
+    def display(self, graph=None, clusters=[], filename='out.png', emphasis=[], emph_color=None):
         """
-        Show representation of the graph.
+        Show representation of the graph. Saves to a png file so that the image can be viewed in
+            image application with more capable zooming opportunities.
         :param igraph graph: graph to display. If none, uses main graph.
-        :param clusters graph: clusters to show on the display.
+        :param list clusters: clusters (by name) to show on the display. If none are provided, shows
+            all nodes as if in a single cluster.
+        :param str filename: location to save the display to.
+        :param list emphasis: List of nodes (by name) to emphasize. Nodes will be made larger and have
+            unique coloring, if emph_color is set to a value.
         """
         if graph is None:
             graph = self.__graph__
         
         # set up colors by cluster label.
-        cdict = {}
-        cdict[None] = 'grey'
-        colors = ['blue', 'green', 'red', 'purple', 'orange', 'yellow']
+        cdict = defaultdict(lambda: 'grey')
+        colors = ['blue', 'green', 'red', 'purple', 'orange', 'yellow', 'white', 'black']
         for cluster, color in zip(clusters, colors):
             cdict[cluster] = color
 
         # Set up visual_sytle
         visual_style = {}
-        visual_style['vertex_size'] = 20
-        if len(clusters) > 0:
-            v_colors = [cdict[vertex[Graph.CLUSTER]] for vertex in graph.vs]
-            visual_style['vertex_color'] = v_colors
-        if len(graph.es) > 0:
-            visual_style['edge_label'] = graph.es[Graph.SIM] # set edge weights to display
-        visual_style['layout'] = graph.layout('large') # layout optimized for large graphs.
-        visual_style['vertex_label'] = graph.vs['name'] # display the id on the node.
-        visual_style['bbox'] = (2000,2000)
-        # indexes = [v.index for v in graph.vs] # get list of all indexes for vectors in the graph.
+        dim = 14000
+        visual_style['bbox'] = (dim, dim)
+        v_size = [50 if vertex['name'] in emphasis else 20 for vertex in graph.vs]
+        visual_style['vertex_size'] = v_size
+        # color emphasis if listed in emphasis, else do the clusters coloring
+        v_colors = [emph_color if (not emph_color is None and vertex['name'] in emphasis) \
+                    else cdict[vertex[Graph.CLUSTER]] for vertex in graph.vs]
+        visual_style['vertex_color'] = v_colors
+        visual_style['layout'] = graph.layout('drl') # layout optimized for large graphs.
+        #visual_style['vertex_label'] = graph.vs['name'] # display the id on the node.
+        #if len(graph.es) > 0:
+        #    visual_style['edge_label'] = graph.es[Graph.SIM] # set edge weights to display
 
         igraph.plot(graph, filename, **visual_style)
     
@@ -374,6 +416,11 @@ class GraphDriver():
         input('Press anything to continue.')
         g.add_edges([Edge('other', 'nodes', 3.14), Edge('nodes', 'bar', 6.0)])
         g.display()
+        input('Press anything to continue')
+        # test emphasis
+        g.display(emphasis=['bar', 'nodes'])
+        input('Press anything to continue.')
+        g.display(emphasis=['bar', 'other'], emph_color='red')
         input('Press anything to continue.')
         n = g.node('bar')
         e = g.edge('bar', 'baz')
@@ -393,6 +440,10 @@ class GraphDriver():
         g.add_to_cluster(['other', 'nodes', 'bar'], 'C2')
         g.display(clusters=['C1', 'C2'])
         input('Press anything to Continue.')
+        g.display(clusters=['C1', 'C2'], emphasis=['other'])
+        input('Press anything to continue.')
+        g.display(clusters=['C1', 'C2'], emphasis=['other'], emph_color='orange')
+        input('Press anything to continue.')
         g.remove_from_cluster(['bar'], 'C1')
         g.display(clusters=['C1', 'C2'])
         input('Press anything to continue.')
@@ -406,15 +457,17 @@ class GraphDriver():
         g = Graph.load('foo')
         g.display(clusters=['C1', 'C2'])
         input('Press anything to continue')
+    
+    @staticmethod
+    def test2():
+        g = Graph()
+        df = pd.DataFrame([[1,2,3,4], [7,2,3,1], [1,2,4,5]])
+        sim = Similarity.cosine_similarity(df, df)
+        g.add_similarity(sim)
+        g.display()
 
-
-GraphDriver.test()
-
-
-
-                
-
-
+#GraphDriver.test()
+#GraphDriver.test2()
 
 """"
 Notes:

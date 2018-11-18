@@ -6,6 +6,9 @@ from os.path import isfile
 from util import timed
 from database import Database
 from multiprocessing import Pool
+from graph import Graph
+from distance import Similarity
+import numpy as np
 
 ################################################################
 ####                    GENERIC LOADER                      ####
@@ -153,3 +156,44 @@ class Loader():
         db.add_visual_descriptors(files)
 
         return db
+
+
+
+    @staticmethod
+    @timed
+    def make_graphs(db, k=10):
+        all_photos = db.get_vis_table()
+        similarity = Similarity.cosine_similarity(all_photos, all_photos)
+        assert(similarity.shape[0] == similarity.shape[1])
+        # set similarity diagonal to 0 so we don't have to deal with self similarity.
+        length = similarity.shape[0]
+        similarity.values[[np.arange(length)]*2]=0
+
+        # get similar k only.
+        edge_dict = {}
+        for i in range(length):
+            row = similarity.iloc[i]
+            edge_dict[row.name] = {}
+            sorted_row = row.sort_values(ascending=False)
+            keys = sorted_row.iloc[:k].index
+            for key in keys:
+                edge_dict[row.name][key] = sorted_row[key]
+        
+
+        for nearest in range(k, 0, -1):
+
+            # get rid of smallest item.
+            print(f'Working on graph {nearest}.')
+            for key in edge_dict:
+                min_key = min(edge_dict[key], key=edge_dict[key].get)
+                edge_dict[key].pop(min_key)
+
+            print(f'\tSimilarity graph for {nearest} created.')
+            
+            location = 'graph/graph' + str(nearest)
+            g = Graph()
+            g.add_edge_dict(edge_dict)
+            g.display(filename=location+'.png')
+            g.save(location=location)
+        
+        return g
