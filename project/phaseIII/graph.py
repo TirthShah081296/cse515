@@ -1,5 +1,4 @@
 #! /bin/usr/python3.6
-
 import igraph
 # igraph also requires pycairo
 from os.path import isfile

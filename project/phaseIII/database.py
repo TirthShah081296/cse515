@@ -5,20 +5,20 @@ from os import listdir, mkdir
 from os.path import basename, join, isfile, splitext, split, isdir
 from csv import reader
 from util import timed
+from collections import defaultdict
 
 class Database():
 
     ##
     # Store the various pandas dataframes for local use.
-    def __init__(self):
-        
+    def __init__(self, source=None):
+        self.source = source # indicates the dataset file location. 
         self.vis_descriptors = {}
         self.vis = None
-        # self.txt_descriptors = {}
+        self.txt_descriptors = {}
         self.locations = None
         self.vis_models = ['CM', 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
         
-
 
     ##################################################################
     ###                         ADDING DATA                        ###
@@ -38,6 +38,7 @@ class Database():
     #   location ids.
     def add_locations(self, locations):
         self.locations = pd.DataFrame(data=locations, columns=['id', 'title', 'name', 'latitude', 'longitude', 'wiki'])
+        self.locations = self.locations.set_index('id')
         print('Locations Loaded...')
 
 
@@ -49,7 +50,7 @@ class Database():
     # each dictionary corresponding to locations, photos, users.
     #
     # NOTE id is not the key, as id's will repeat. (each id has multiple terms)
-    """def add_txt_descriptors(self, txt_descriptors):
+    def add_txt_descriptors(self, txt_descriptors):
 
         for desc_type, table in txt_descriptors.items():
 
@@ -59,7 +60,7 @@ class Database():
                 # we want to change the location names to the location ids
                 #rows = [ [self.get_location_by_name(row[0])['id']] + row[1:] for row in rows]
                 for poi_name in old_table.keys():
-                    table[self.get_location_by_name(poi_name)['id']] = old_table[poi_name]
+                    table[self.get_location_by_name(poi_name).name] = old_table[poi_name]
                 # Manually delete old_table from memory - memory is maxed out otherwise
                 del(old_table)
 
@@ -69,7 +70,6 @@ class Database():
             del(b) # - attempt at memory efficiency.
         
         print("User Descriptions Loaded...")
-    """
     
 
     ##
@@ -90,7 +90,7 @@ class Database():
             filename = Database.get_file_name(file)
             loc_title, model = get_info_from_file(filename)
             location = self.get_location_by_title(loc_title)
-            locationid = location['id']
+            locationid = int(location.name)
             # get number of columns in CSV file.
             with open(file, 'r') as f:
                 readr = reader(f)
@@ -101,8 +101,8 @@ class Database():
             self.vis_descriptors[locationid, model] = table.sort_index().to_sparse().fillna(0)
         
         # NOTE: This is added in phase III for efficiency purposes. Limits functionality for speed.
-        self.vis = self.get_vis_table_old()
-        self.vis_descriptors = None
+        # self.vis = self.get_vis_table_old()
+        # self.vis_descriptors = None
 
         print("Visual Descriptors Loaded...")
 
@@ -110,6 +110,44 @@ class Database():
     ##################################################################
     ###                      Retrieving Data                       ###
     ##################################################################
+
+
+
+    # Other ###################################################
+
+    def get_img_loc(self, image):
+        # arbitrarily select a model. They all have the same exact information anyway.
+        model = self.vis_models[0]
+        # iterate over locations to find one with image.
+        for loc_id in self.get_location_ids():
+            table = self.get_vis_table(loc_id, model)
+            if int(image) in table.index:
+                return loc_id
+        # Not found.
+        return None
+    
+
+    def get_img_locs(self, images):
+        """
+        Gets locations for each image in a set. More efficient than calling above multiple times for
+            multiple images.
+        :param list images: list of int image ids.
+        :return dict: maps image ids to their loc_id.
+        """
+        # arbitrarily select a model.
+        model = self.vis_models[0]
+        # iterate and create the dictionary.
+        returnval = defaultdict(lambda: None)
+        for loc_id in self.get_location_ids():
+            table = self.get_vis_table(loc_id, model)
+            intersection = [i for i in images if i in table.index]
+            for item in intersection:
+                returnval[item] = loc_id
+            if len(returnval) == len(images):
+                break
+        
+        return returnval
+
 
 
     # Locations ###############################################
@@ -122,40 +160,47 @@ class Database():
         return location.iloc[0]
     
     def get_location_by_name(self, name):
+        """
+        Returns the series corresponding to a location.
+        """
         location = self.get_table_value(self.locations, 'name', name)
         return location.iloc[0]
         
     def get_location(self, an_id):
-        location = self.get_table_value(self.locations, 'id', an_id)
-        return location.iloc[0]
+        # location = self.get_table_value(self.locations, 'id', an_id)
+        return self.locations.loc[an_id]
 
     def get_location_ids(self):
-        return list(self.locations.loc[:,'id'])
-
-
+        return self.locations.index
+    
+    def get_location_titles(self):
+        returnval = {}
+        locs = self.get_location_ids()
+        titles = self.locations['title']
+        for loc, title in zip(locs, titles):
+            returnval[loc] = title
+        return returnval
 
     # txt descriptors #####################################
-    
-    #def get_txt_desc_table(self, atype):
-    #    return self.txt_descriptors[atype]
+    def get_txt_desc_table(self, atype):
+        return self.txt_descriptors[atype]
 
 
-    # def get_txt_vector(self, atype, an_id):
-    #    """
-    #    returns a series with term index and integer indicating presence of term.
-    #    """
-    #    table = self.get_txt_desc_table(atype)
-    #    return table.loc[an_id]
-
+    def get_txt_vector(self, atype, an_id):
+         """
+         returns a series with term index and integer indicating presence of term.
+         """
+         table = self.get_txt_desc_table(atype)
+         return table.loc[an_id]
 
 
     # vis descriptors #####################################
 
 
-    def get_vis_table(self):
-        return self.vis
+    # def get_vis_table(self):
+    #    return self.vis
 
-    def get_vis_table_old(self, locationid=None, model=None):
+    def get_vis_table(self, locationid=None, model=None):
         # If given both a location and a model, get the table.
         if locationid and model:
             return self.vis_descriptors[locationid, model]
@@ -166,7 +211,7 @@ class Database():
         elif model:
             table = None
             for loc in self.get_location_ids():
-                loc_table = self.get_vis_table_old(loc, model)
+                loc_table = self.get_vis_table(loc, model)
                 if table is None:
                     table = loc_table
                 else:
@@ -180,7 +225,7 @@ class Database():
         elif locationid:
             table = None
             for vis_model in self.vis_models:
-                model_table = self.get_vis_table_old(locationid, vis_model)
+                model_table = self.get_vis_table(locationid, vis_model)
                 if table is None:
                     table = model_table
                 else:
@@ -194,7 +239,7 @@ class Database():
         else:
             table = None
             for loc in self.get_location_ids():
-                sub_table = self.get_vis_table_old(locationid=loc)
+                sub_table = self.get_vis_table(locationid=loc)
                 #  combine in table as appropriate.
                 if table is None:
                     table = sub_table

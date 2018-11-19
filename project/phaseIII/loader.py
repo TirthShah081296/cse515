@@ -2,7 +2,7 @@
 
 from lxml import etree
 from os import listdir, path
-from os.path import isfile
+from os.path import isfile, isdir, join
 from util import timed
 from database import Database
 from multiprocessing import Pool
@@ -121,6 +121,65 @@ class LocationReader(GenericReader): # GenericReader inheritance - don't forget 
         return name_correlation
 
 
+
+################################################################
+####               TEXT DESCRIPTION LOADER                  ####
+################################################################
+
+# NOTE -  The textual descriptions can be found in the folder Dataset/desctext
+#   Each of them are structured as followed.
+#   ID  "Text Term That Appeared" TF IDF TF-IDF
+#   The ID will be the id of an image, user, or other depending on the
+#       file.
+#
+# Indended to be used by calling load_files. Returns dictionary with keys
+#   'photos', 'users', and 'poi'. Each key points to a pandas dataframe with
+#   the description information for those items.
+class DescriptionReader(GenericReader):
+
+    def __init__(self):
+        self.seen = []
+
+    def load_file(self, file, index):
+        if not isfile(file):
+            raise OSError('Could not parse description file ' + str(file) + ' as it doesn\'t exist')
+        
+        # Strategy - create matrix representation with lists and then put into a new pandas dataframe.
+        table = {}
+        with open(file) as f:
+            for i, line in enumerate(f):
+                # Tokenize
+                tokens = line.split(' ')
+                if '\n' in tokens:
+                    tokens.remove('\n')
+                # Find out how many tokens make up the ID
+                for k, token in enumerate(tokens):
+                    if '"' in token:
+                        # This is our first term. Return our index to get the id.
+                        j = k
+                        break
+                an_id = ' '.join(tokens[0: j])
+                # convert to an int if possible
+                try:
+                    an_id = int(an_id)
+                except:
+                    pass
+
+                table[an_id] = {}
+
+                for k in range(j,len(tokens), 4):
+                    four_tuple = tokens[k : k + 4]
+                    term, tf, idf, tfidf = four_tuple
+                    term = term.replace('\"', '')
+                    # if 'User' in file and i == 784 and term[0] == 'x':
+                    #     print(four_tuple)
+                    table[an_id][term] = tfidf # At TAs Recommendation I chose one of these models arbitrarily.
+
+        return table
+
+
+
+
 ################################################################
 ####                   VISUAL DESC LOADER                   ####
 ################################################################
@@ -134,6 +193,7 @@ class VisualDescriptionReader(GenericReader):
         return file
 
 
+
 ################################################################
 ####                    Load All Data                       ####
 ################################################################
@@ -143,16 +203,27 @@ class Loader():
     @timed
     def make_database(folder):
 
-        db = Database()
+        if not isdir(folder):
+            raise TypeError('Loader requires a valid directory to load dataset from.')
+
+        db = Database(folder)
         # p = P ool(processes=3)
         
         # Load location data for associating the id's to the names.
-        loc_files = (folder + '/devset_topics.xml', folder + '/poiNameCorrespondences.txt')
+        loc_files = (join(folder, 'devset_topics.xml'), join(folder, 'poiNameCorrespondences.txt'))
         location_dict = LocationReader().load_files(*loc_files)
         db.add_locations(location_dict)
         
+        # Load text description data.
+        text_files = [join(folder, 'desctxt', 'devset_textTermsPerPOI.txt'),
+                      join(folder, 'desctxt', 'devset_textTermsPerImage.txt'),
+                      join(folder, 'desctxt', 'devset_textTermsPerUser.txt')]
+        types = ['poi', 'photo', 'user']
+        descs = DescriptionReader().load_files(text_files,types)
+        db.add_txt_descriptors(descs)
+        
         # Load visual description data.
-        files = VisualDescriptionReader().load_folder(folder + '/descvis/img/')
+        files = VisualDescriptionReader().load_folder(join(folder, 'descvis', 'img'))
         db.add_visual_descriptors(files)
 
         return db
@@ -183,14 +254,14 @@ class Loader():
         for nearest in range(k, 0, -1):
 
             # get rid of smallest item.
-            print(f'Working on graph {nearest}.')
+            print('Working on graph %s.' % nearest)
             for key in edge_dict:
                 min_key = min(edge_dict[key], key=edge_dict[key].get)
                 edge_dict[key].pop(min_key)
 
-            print(f'\tSimilarity graph for {nearest} created.')
+            print('\tSimilarity graph for %s created.' % nearest)
             
-            location = 'graph/graph' + str(nearest)
+            location = join('graph', 'graph' + str(nearest))
             g = Graph()
             g.add_edge_dict(edge_dict)
             g.display(filename=location+'.png')

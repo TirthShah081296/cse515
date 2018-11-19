@@ -5,7 +5,7 @@ from graph import Graph
 from os.path import abspath, isdir, isfile
 import argparse
 from util import timed
-
+import util
 
 class Interface():
 
@@ -81,7 +81,7 @@ class Interface():
 
     def help(self, args):
         """
-        Command:\   thelp
+        Command:\thelp
         Description:\tPrints the interface information about the program.
         """
 
@@ -157,7 +157,7 @@ class Interface():
         k = int(args.k)
 
         # YOUR CODE HERE.
-    
+
 
 
     def task4(self, args):
