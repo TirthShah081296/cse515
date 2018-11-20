@@ -8,6 +8,7 @@ import pickle
 from collections import defaultdict
 import pandas as pd
 from distance import Similarity
+from sys import stdout
 
 
 class Edge():
@@ -311,6 +312,21 @@ class Graph():
         self.__add_label__(node, Graph.CLUSTER, c)
     
 
+
+    def clear_clusters(self, graph=None):
+        """
+        Deletes cluster data from graph.
+        :param Graph graph: Graph obj. If None, uses default.
+        """
+        if graph is None:
+            graph = self.__graph__
+
+        self.clusters = {}
+        clusters = [None for v in graph.vs]
+        self.__graph__.vs[Graph.CLUSTER] = clusters
+
+    
+
     def display(self, graph=None, clusters=[], filename='out.png', emphasis=[], emph_color=None):
         """
         Show representation of the graph. Saves to a png file so that the image can be viewed in
@@ -349,6 +365,29 @@ class Graph():
         igraph.plot(graph, filename, **visual_style)
     
 
+
+    def display_clusters_text(self, clusters=None, keys=None, file=stdout):
+        """
+        Show clusters as text. Saves them to file if a file is specified, else goes to stdout.
+        :param list clusters: clusters dictionary. If None, uses default.
+        :param list keys: clusters to print from dictionary. If None, uses all.
+        :param str filename: filename to print to. If no file, uses stdout.
+        """
+        if isinstance(file, str):
+            file = open(file, 'r+')
+        
+        if clusters is None:
+            clusters = self.clusters
+        
+        if keys is None:
+            keys = clusters.keys()
+
+        for cluster in clusters:
+            file.write('CLUSTER = %s' % cluster)
+            for img in clusters[cluster]:
+                file.write('\t%s' % img)
+
+    
 
     def nodes_in_cluster(self, cluster, use_dict=True, graph=None):
         """

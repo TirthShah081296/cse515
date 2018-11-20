@@ -23,6 +23,18 @@ def timed(f):
     return wrapper
 
 
+
+def show_images(images, db):
+    """
+    Displays a list of image id's by opening them up in individual windows.
+    :param list images: list of image id's.
+    :param Database db:
+    """
+    files = get_img_files(images, db)
+    show_files(files)
+
+
+
 def get_img_file(image, db):
     """
     Gets the file location for the image it is given.
@@ -68,7 +80,7 @@ def get_img_files(images, db):
 
 
 
-def show_image(file_location):
+def show_file(file_location):
     """
     Displays an image to screen by opening it up in a separate window.
     :param str file_location: path to the image.
@@ -77,10 +89,11 @@ def show_image(file_location):
     img.show()
 
 
-def show_images(file_locations):
+def show_files(file_locations):
     """
     Displays a set of images to screen by opening them up in individual windows.
     :param list file_locations: list of paths to images.
     """
     for file_loc in file_locations:
         show_image(file_loc)
+
