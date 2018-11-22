@@ -10,4 +10,5 @@ This code has the following python-library dependencies:
   4. scikit-learn 0.20.0
   5. python-igraph 0.7.1
   6. pycairo 1.18.0
+      Requires cairo intallation. See https://www.cairographics.org/download/
   7. pillow 5.3.0
