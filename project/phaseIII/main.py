@@ -148,6 +148,22 @@ class Interface():
         alg = args.alg
 
         #YOUR CODE HERE.
+        clusters = {}
+        images = self.__graph__.get_images()
+        list_of_clusters = []
+        # Clustering function
+        for image in images:
+            cluster = some_function(image)
+            if not cluster in list_of_clusters:
+                list_of_clusters.append(cluster)
+            clusters[image] = cluster
+        
+        # display
+        for image in images:
+            self.__graph__.add_to_cluster(image, clusters[image])
+        self.__graph__.display(clusters=list_of_clusters, filename='task2.png')
+
+
 
 
 

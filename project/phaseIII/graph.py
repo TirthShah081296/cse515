@@ -198,6 +198,11 @@ class Graph():
         self.__add_edges__(edges, weights)
         return
 
+    
+
+    def get_images(self):
+        return self.__graph__.vs()['name']
+
 
     
     def node(self, name):
@@ -324,6 +329,22 @@ class Graph():
         self.clusters = {}
         clusters = [None for v in graph.vs]
         self.__graph__.vs[Graph.CLUSTER] = clusters
+    
+
+
+    def get_adjacency(self, graph=None, weighted=False):
+        """
+        """
+        if graph is None:
+            graph = self.__graph__
+
+        param_dict = {}
+        if weighted:
+            param_dict['attribute'] = Graph.SIM
+            param_dict['default'] = 0
+         
+        a = graph.get_adjacency(**param_dict)
+        return pd.DataFrame(data=a, index = graph.vs, columns=graph.vs)
 
     
 
@@ -343,7 +364,7 @@ class Graph():
         
         # set up colors by cluster label.
         cdict = defaultdict(lambda: 'grey')
-        colors = ['blue', 'green', 'red', 'purple', 'orange', 'yellow', 'white', 'black']
+        colors = ['blue', 'red', 'green', 'purple', 'orange', 'yellow', 'white', 'black']
         for cluster, color in zip(clusters, colors):
             cdict[cluster] = color
 
@@ -530,4 +551,11 @@ For Spectral Partiitioning:
     2. Pass to scipy to make into laplacian.
     3. Use numply.linalg.eig to get eigenvectors
     4. Use second eigenvector to form two clusters.
+"""
+
+"""
+for img in images:
+    label = labels[img]
+    graph.add_to_cluster(img, label)
+graph.display(clusters=labels.keys())
 """
