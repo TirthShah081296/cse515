@@ -344,7 +344,8 @@ class Graph():
             param_dict['default'] = 0
          
         a = graph.get_adjacency(**param_dict)
-        return pd.DataFrame(data=a, index = graph.vs, columns=graph.vs)
+        labels = graph.vs['name']
+        return pd.DataFrame(data=a.data, index = labels, columns=labels)
 
     
 
@@ -525,8 +526,19 @@ class GraphDriver():
         g.add_similarity(sim)
         g.display()
 
+    @staticmethod
+    def test_adjacency():
+        g = Graph()
+        df = pd.DataFrame([[1,2,3], [4,5,6], [7,8,9]])
+        sim = Similarity.cosine_similarity(df, df)
+        print(sim)
+        g.add_similarity(sim)
+        s2 = g.get_adjacency(weighted=True)
+        assert(sim.equals(s2))
+
 #GraphDriver.test()
 #GraphDriver.test2()
+GraphDriver.test_adjacency()
 
 """"
 Notes:
