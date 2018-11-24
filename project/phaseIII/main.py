@@ -215,9 +215,10 @@ class Interface():
 
         # YOUR CODE HERE.
         G = self.__graph__.get_adjacency()
+        images = self.__graph__.get_images()
         n = G.shape[0]
         s = 0.86
-        maxerr = 0.0001
+        maxerr = 0.001
 
         # transform G into markov matrix A
         A = csc_matrix(G, dtype=np.float)
@@ -243,7 +244,14 @@ class Interface():
 
                 r[i] = ro.dot(Ai * s + Di * s + Ei * (1 - s))
 
-        # weights = r / float(sum(r))
+        weights = r / float(sum(r))
+        orderedWeights = np.argsort(weights)
+        ReorderedWeights = np.flipud(orderedWeights)
+        # m = max(weights)
+        # ind = np.argmax(weights)
+        listOfImages = list()
+        for xx in range(k):
+            listOfImages.append(images[ReorderedWeights[xx]])
         # weightDict = {}
         # for xx in range(len(weights)):
         #     weightDict[xx] = weights[xx]
