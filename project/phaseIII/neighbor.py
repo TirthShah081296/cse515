@@ -124,3 +124,31 @@ class Neighbor():
         table = table.iloc[:, vec_indexes]
 
         return Neighbor.knn(k, vector, table, processes)
+    
+    @staticmethod
+    @timed
+    def knn_visual_LSH(k, this_image, database, those_images, processes=1):
+        """
+        KNN Specific method for visual vectors. Retrieves the visual description table based \
+            on the imageIds passed. If locationid is None, the table is for all locations. \
+            If model is None, the table is for all visual models. If both are none, the table is \
+            for all locations and visual models. Calls KNN on vector and table derived.
+
+        The KNN cuts the vector and table to only the columns present in the vector for \
+            efficiency and because the professor seems to suggest this is acceptable.
+        """
+        # edit table to get only desired imageIds(received from LSH bucketing) to be included
+
+        whole_table = database.get_vis_table()
+
+        table = []
+        for image in those_images:
+            table.append(whole_table[image])
+
+        vector = table.loc[this_image]
+        vec_indexes = vector.nonzero()[0]
+        vector = vector[vec_indexes]
+
+        table = table.iloc[:, vec_indexes]
+
+        return Neighbor.knn(k, vector, table, processes)
