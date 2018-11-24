@@ -5,6 +5,9 @@ from graph import Graph
 from os.path import abspath, isdir, isfile
 import argparse
 from util import timed
+import numpy as np
+import numpy.linalg as la
+import scipy.cluster.vq as vq
 import util
 
 class Interface():
@@ -142,27 +145,67 @@ class Interface():
 
 
     def task2(self, args):
-        if args.k == None or args.alg == None:
-            raise ValueError('K and Alg must be defined for task 2.')
+        if args.k == None:
+            raise ValueError('K must be defined for task 2.')
         c = int(args.k)
-        alg = args.alg
+        # alg = args.alg
 
         #YOUR CODE HERE.
         clusters = {}
+        clusters1 = {}
         images = self.__graph__.get_images()
         list_of_clusters = []
-        # Clustering function
-        for image in images:
-            cluster = some_function(image)
-            if not cluster in list_of_clusters:
-                list_of_clusters.append(cluster)
-            clusters[image] = cluster
-        
-        # display
-        for image in images:
-            self.__graph__.add_to_cluster(image, clusters[image])
-        self.__graph__.display(clusters=list_of_clusters, filename='task2.png')
+        list_of_clusters1 = []
+        lengOfA = 0
+        lengOfB = 0
+        lengOfClusters = {}
+        A = self.__graph__.get_adjacency()
+        D = np.diag(np.ravel(np.sum(A,axis=1)))
+        L = D - A
+        l, U = la.eigh(L)
+        f = U[:, 1]
+        # labels = np.ravel(np.sign(f))
+        # # Clustering function
+        # for image in images:
+        #
+        #     if(labels[images.index(image)] == -1):
+        #         cluster = 'A'
+        #         clusters[image] = cluster
+        #         lengOfA += 1
+        #     # cluster = some_function(image)
+        #         if not cluster in list_of_clusters:
+        #             list_of_clusters.append(cluster)
+        #     else:
+        #         cluster = 'B'
+        #         clusters[image] = cluster
+        #         lengOfB += 1
+        #         if not cluster in list_of_clusters:
+        #             list_of_clusters.append(cluster)
+        #
+        # # display
+        # for image in images:
+        #     self.__graph__.add_to_cluster(image, clusters[image])
+        # self.__graph__.display(clusters=list_of_clusters, filename='task2.png')
+        # print("Clusters in A:", lengOfA)
+        # print("Clusters in B:", lengOfB)
 
+        # k = 3
+        xx = c+1
+        means, labels1 = vq.kmeans2(U[:, 1:xx], c, iter= 500)
+        for j in range(c):
+            indices = [i for i, x in enumerate(labels1) if x == j]
+            lengOfClusters[j] = len(indices)
+            for everyIndice in indices:
+                cluster = j
+                clusters1[images[everyIndice]] = cluster
+            if not j in list_of_clusters1:
+                list_of_clusters1.append(j)
+        for image in images:
+            self.__graph__.add_to_cluster(image, clusters1[image])
+        self.__graph__.display(clusters=list_of_clusters1, filename='task2_kspectral.png')
+        print(lengOfClusters)
+        # {0: 72, 1: 40, 2: 198, 3: 8602}
+        pass
 
 
 
