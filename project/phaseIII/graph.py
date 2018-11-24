@@ -538,7 +538,7 @@ class GraphDriver():
 
 #GraphDriver.test()
 #GraphDriver.test2()
-GraphDriver.test_adjacency()
+# GraphDriver.test_adjacency()
 
 """"
 Notes:

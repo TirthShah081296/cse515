@@ -2,10 +2,11 @@
 
 import pandas as pd
 from os import listdir, mkdir
-from os.path import basename, join, isfile, splitext, split, isdir
+from os.path import basename, join, isfile, splitext, split, isdir, abspath
 from csv import reader
 from util import timed
 from collections import defaultdict
+import pickle
 
 class Database():
 
@@ -15,9 +16,10 @@ class Database():
         self.source = source # indicates the dataset file location. 
         self.vis_descriptors = {}
         self.vis = None
-        self.txt_descriptors = {}
+        # self.txt_descriptors = {}
         self.locations = None
         self.vis_models = ['CM', 'CM3x3', 'CN', 'CN3x3', 'CSD', 'GLRLM', 'GLRLM3x3', 'HOG', 'LBP', 'LBP3x3']
+        self.loc_map = {}
         
 
     ##################################################################
@@ -101,10 +103,45 @@ class Database():
             self.vis_descriptors[locationid, model] = table.sort_index().to_sparse().fillna(0)
         
         # NOTE: This is added in phase III for efficiency purposes. Limits functionality for speed.
-        # self.vis = self.get_vis_table_old()
-        # self.vis_descriptors = None
+        self.simplify_db()
 
         print("Visual Descriptors Loaded...")
+
+
+    
+    def load_vis(self, subdir='saved'):
+        """
+        """
+        path = abspath(join(subdir, 'visdata.pickle'))
+        if isfile(path):
+            self.vis_descriptors = None
+            self.vis = pd.read_pickle(path)
+            with open(abspath(join(subdir, 'loc.pickle')), 'rb') as f:
+                self.loc_map = pickle.load(f)
+            print('Visual Descriptors Loaded...')
+            return True
+        return False
+
+
+    def simplify_db(self, subdir='saved'):
+        """
+        Used in phase III to put data into a reduced state that is faster, since we don't need all the
+        visual data separated by location.
+        """
+        arbitrary_model = 'CM'
+        for location in self.locations.index:
+            for photo in self.vis_descriptors[location, arbitrary_model].index:
+                self.loc_map[int(photo)] = location
+                #self.loc_map[location] = list([int(a) for a in self.vis_descriptors[location,arbitrary_model].index])
+
+        # Set as combined table.        
+        self.vis = self.get_vis_table()
+        file_loc = abspath(join(subdir, 'visdata.pickle'))
+        self.vis.to_pickle(file_loc)
+        with open(abspath(join(subdir, 'loc.pickle')), 'wb+') as f:
+            pickle.dump(self.loc_map, f)
+        del(self.vis_descriptors)
+        self.vis_descriptors = None
 
 
     ##################################################################
@@ -116,13 +153,17 @@ class Database():
     # Other ###################################################
 
     def get_img_loc(self, image):
-        # arbitrarily select a model. They all have the same exact information anyway.
-        model = self.vis_models[0]
+        if self.loc_map is None:
+            raise ValueError('Loc Map must be loaded to get image locations.')
         # iterate over locations to find one with image.
+        if image in self.loc_map:
+            return self.loc_map[image]
+        """
         for loc_id in self.get_location_ids():
             table = self.get_vis_table(loc_id, model)
             if int(image) in table.index:
                 return loc_id
+        """
         # Not found.
         return None
     
@@ -134,10 +175,17 @@ class Database():
         :param list images: list of int image ids.
         :return dict: maps image ids to their loc_id.
         """
-        # arbitrarily select a model.
-        model = self.vis_models[0]
+        if self.loc_map is None:
+            raise ValueError('Loc Map must be loaded to get image locations!')
         # iterate and create the dictionary.
         returnval = defaultdict(lambda: None)
+        for image in images:
+            if not image in self.loc_map:
+                continue
+            returnval[image] = self.loc_map[image]
+        """
+        # arbitrarily select a model.
+        model = self.vis_models[0]
         for loc_id in self.get_location_ids():
             table = self.get_vis_table(loc_id, model)
             intersection = [i for i in images if i in table.index]
@@ -145,7 +193,7 @@ class Database():
                 returnval[item] = loc_id
             if len(returnval) == len(images):
                 break
-        
+        """
         return returnval
 
 
@@ -201,6 +249,10 @@ class Database():
     #    return self.vis
 
     def get_vis_table(self, locationid=None, model=None):
+        # for Phase III only - speeds things up.
+        if not self.vis is None:
+            return self.vis
+
         # If given both a location and a model, get the table.
         if locationid and model:
             return self.vis_descriptors[locationid, model]

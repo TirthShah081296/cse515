@@ -4,12 +4,11 @@ from distance import Similarity
 from graph import Graph
 from os.path import abspath, isdir, isfile
 import argparse
-from util import timed
+from util import timed, show_images
 import numpy as np
 import numpy.linalg as la
 import scipy.cluster.vq as vq
 from scipy.sparse import csc_matrix
-import util
 
 class Interface():
 
@@ -48,9 +47,14 @@ class Interface():
             user_input = user_input.split(' ')
             try:
                 args = parser.parse_args(user_input)
-            except Exception as e:
+            except argparse.ArgumentError as e:
                 print("The command line input could not be parsed.")
                 print(e)
+                continue
+            except BaseException as e:
+                print('The command line arguments could not be parsed.')
+                print(e)
+                continue
 
             # load the database from the folder.
             if args.load:
@@ -59,6 +63,7 @@ class Interface():
                 except Exception as e:
                     print('Something went wrong during database load.')
                     print(e)
+
 
             # load the graph from the file.
             if args.graph:
@@ -135,10 +140,10 @@ class Interface():
 
     @timed
     def task1(self, args):
-        if args.k == None:
-            raise ValueError('Parameter K must be defined for task 1.')
-        k = int(args.k)
         if self.__graph__ == None:
+            if args.k == None:
+                raise ValueError('Parameter K must be defined for task 1.')
+            k = int(args.k)
             self.__graph__ = Loader.make_graphs(self.__database__, k)
         # visualize graph.
         self.__graph__.display()
@@ -315,15 +320,20 @@ class Interface():
 
     
     def task5(self, args):
-        if args.layers == None or args.hashes == None \
-            or args.vectors == None or args.k == None \
-            or args.imgs == None:
+        """
+        Use as:
+        -task 5 --layers # --hashes # --k # --imgs #
+        """
+        if args.layers == None or args.hashes == None or \
+            args.k == None or args.imgs == None:
             raise ValueError('Layers, Hashes, Vectors, K, and IMG must all be defined for task 5.')
+        
         layers = int(args.layers)
         hashes = int(args.hashes)
-        vectors = str(args.vectors)
         t = int(args.k)
         imgs = list(args.imgs)
+        if args.vectors:
+            vectors = str(args.vectors)
     
         # YOUR CODE HERE
     

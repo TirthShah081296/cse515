@@ -79,7 +79,6 @@ def get_img_files(images, db):
     return returnval
 
 
-
 def show_file(file_location):
     """
     Displays an image to screen by opening it up in a separate window.
@@ -97,3 +96,11 @@ def show_files(file_locations):
     for file_loc in file_locations:
         show_image(file_loc)
 
+
+def show_image(file_location):
+    """
+    Displays an image to screen by opening it up in a separate window.
+    :param str file_location: path to the image.
+    """
+    img = Image.open(file_location)
+    img.show()

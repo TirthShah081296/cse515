@@ -201,7 +201,7 @@ class Loader():
 
     @staticmethod
     @timed
-    def make_database(folder):
+    def make_database(folder, visdata='visdata.pickle'):
 
         if not isdir(folder):
             raise TypeError('Loader requires a valid directory to load dataset from.')
@@ -215,16 +215,17 @@ class Loader():
         db.add_locations(location_dict)
         
         # Load text description data.
-        text_files = [join(folder, 'desctxt', 'devset_textTermsPerPOI.txt'),
-                      join(folder, 'desctxt', 'devset_textTermsPerImage.txt'),
-                      join(folder, 'desctxt', 'devset_textTermsPerUser.txt')]
-        types = ['poi', 'photo', 'user']
-        descs = DescriptionReader().load_files(text_files,types)
-        db.add_txt_descriptors(descs)
+        #text_files = [join(folder, 'desctxt', 'devset_textTermsPerPOI.txt'),
+                      #join(folder, 'desctxt', 'devset_textTermsPerImage.txt'),
+                      #join(folder, 'desctxt', 'devset_textTermsPerUser.txt')]
+        #types = ['poi', 'photo', 'user']
+        #descs = DescriptionReader().load_files(text_files,types)
+        #db.add_txt_descriptors(descs)
         
         # Load visual description data.
-        files = VisualDescriptionReader().load_folder(join(folder, 'descvis', 'img'))
-        db.add_visual_descriptors(files)
+        if not(db.load_vis()):
+            files = VisualDescriptionReader().load_folder(join(folder, 'descvis', 'img'))
+            db.add_visual_descriptors(files)
 
         return db
 
