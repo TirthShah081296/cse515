@@ -255,6 +255,7 @@ class Interface():
         # weightDict = {}
         # for xx in range(len(weights)):
         #     weightDict[xx] = weights[xx]
+        print(listOfImages)
         pass
 
     def task4(self, args):
@@ -262,8 +263,54 @@ class Interface():
             raise ValueError('K and Imgs must be defined for task 4.')
         k = int(args.k)
         imgs = list(args.imgs)
-    
+        # 6 2976167 83 38391649 299 135049429
         # YOUR CODE HERE.
+        G = self.__graph__.get_adjacency()
+        images = self.__graph__.get_images()
+        indexes = list()
+        for x in imgs:
+            indexes.append(images.index(x))
+        n = G.shape[0]
+        s = 0.86
+        maxerr = 0.001
+
+        # transform G into markov matrix A
+        A = csc_matrix(G, dtype=np.float)
+        rsums = np.array(A.sum(1))[:, 0]
+        ri, ci = A.nonzero()
+        A.data /= rsums[ri]
+
+        # bool array of sink states
+        sink = rsums == 0
+
+        Ei = np.zeros(n)
+        for ii in indexes:
+            Ei[ii] = 1 / len(imgs)
+        # Compute pagerank r until we converge
+        ro, r = np.zeros(n), np.ones(n)
+        while np.sum(np.abs(r - ro)) > maxerr:
+            ro = r.copy()
+            # calculate each pagerank at a time
+            for i in range(0, n):
+                # in-links of state i
+                Ai = np.array(A[:, i].todense())[:, 0]
+                # account for sink states
+                # Di = sink / float(n)
+                # account for teleportation to state i
+
+
+                r[i] = ro.dot(Ai * s + Ei * (1 - s))
+
+        weights = r / float(sum(r))
+        orderedWeights = np.argsort(weights)
+        ReorderedWeights = np.flipud(orderedWeights)
+        # m = max(weights)
+        # ind = np.argmax(weights)
+        listOfImages = list()
+        for xx in range(k):
+            listOfImages.append(images[ReorderedWeights[xx]])
+        print(listOfImages)
+        pass
 
 
     
