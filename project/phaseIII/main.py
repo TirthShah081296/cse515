@@ -8,6 +8,7 @@ from util import timed
 import numpy as np
 import numpy.linalg as la
 import scipy.cluster.vq as vq
+from scipy.sparse import csc_matrix
 import util
 
 class Interface():
@@ -213,8 +214,40 @@ class Interface():
         k = int(args.k)
 
         # YOUR CODE HERE.
+        G = self.__graph__.get_adjacency()
+        n = G.shape[0]
+        s = 0.86
+        maxerr = 0.0001
 
+        # transform G into markov matrix A
+        A = csc_matrix(G, dtype=np.float)
+        rsums = np.array(A.sum(1))[:, 0]
+        ri, ci = A.nonzero()
+        A.data /= rsums[ri]
 
+        # bool array of sink states
+        sink = rsums == 0
+
+        # Compute pagerank r until we converge
+        ro, r = np.zeros(n), np.ones(n)
+        while np.sum(np.abs(r - ro)) > maxerr:
+            ro = r.copy()
+            # calculate each pagerank at a time
+            for i in range(0, n):
+                # in-links of state i
+                Ai = np.array(A[:, i].todense())[:, 0]
+                # account for sink states
+                Di = sink / float(n)
+                # account for teleportation to state i
+                Ei = np.ones(n) / float(n)
+
+                r[i] = ro.dot(Ai * s + Di * s + Ei * (1 - s))
+
+        # weights = r / float(sum(r))
+        # weightDict = {}
+        # for xx in range(len(weights)):
+        #     weightDict[xx] = weights[xx]
+        pass
 
     def task4(self, args):
         if args.k == None or args.imgs == None:
