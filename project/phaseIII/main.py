@@ -164,32 +164,31 @@ class Interface():
         L = D - A
         l, U = la.eigh(L)
         f = U[:, 1]
-        # labels = np.ravel(np.sign(f))
-        # # Clustering function
-        # for image in images:
-        #
-        #     if(labels[images.index(image)] == -1):
-        #         cluster = 'A'
-        #         clusters[image] = cluster
-        #         lengOfA += 1
-        #     # cluster = some_function(image)
-        #         if not cluster in list_of_clusters:
-        #             list_of_clusters.append(cluster)
-        #     else:
-        #         cluster = 'B'
-        #         clusters[image] = cluster
-        #         lengOfB += 1
-        #         if not cluster in list_of_clusters:
-        #             list_of_clusters.append(cluster)
-        #
-        # # display
-        # for image in images:
-        #     self.__graph__.add_to_cluster(image, clusters[image])
-        # self.__graph__.display(clusters=list_of_clusters, filename='task2.png')
-        # print("Clusters in A:", lengOfA)
-        # print("Clusters in B:", lengOfB)
+        labels = np.ravel(np.sign(f))
+        # Clustering function
+        for image in images:
 
-        # k = 3
+            if(labels[images.index(image)] == -1):
+                cluster = 'A'
+                clusters[image] = cluster
+                lengOfA += 1
+
+                if not cluster in list_of_clusters:
+                    list_of_clusters.append(cluster)
+            else:
+                cluster = 'B'
+                clusters[image] = cluster
+                lengOfB += 1
+                if not cluster in list_of_clusters:
+                    list_of_clusters.append(cluster)
+
+        # display
+        for image in images:
+            self.__graph__.add_to_cluster(image, clusters[image])
+        self.__graph__.display(clusters=list_of_clusters, filename='task2.png')
+        print("Clusters in A:", lengOfA)
+        print("Clusters in B:", lengOfB)
+
         xx = c+1
         means, labels1 = vq.kmeans2(U[:, 1:xx], c, iter= 500)
         for j in range(c):
@@ -204,8 +203,6 @@ class Interface():
             self.__graph__.add_to_cluster(image, clusters1[image])
         self.__graph__.display(clusters=list_of_clusters1, filename='task2_kspectral.png')
         print(lengOfClusters)
-        # {0: 72, 1: 40, 2: 198, 3: 8602}
-        pass
 
 
 
