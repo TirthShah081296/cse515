@@ -13,6 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from numpy import union1d
 from database import Database
 from sklearn.neighbors import KNeighborsClassifier
+import pandas as pd
 
 
 # A class is implemented for this tuple to ensure that
