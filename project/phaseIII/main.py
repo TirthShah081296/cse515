@@ -263,6 +263,8 @@ class Interface():
         print(listOfImages)
         pass
 
+
+    @timed
     def task4(self, args):
         if args.k == None or args.imgs == None:
             raise ValueError('K and Imgs must be defined for task 4.')
@@ -277,7 +279,7 @@ class Interface():
             indexes.append(images.index(x))
         n = G.shape[0]
         s = 0.86
-        maxerr = 0.001
+        maxerr = 0.1
 
         # transform G into markov matrix A
         A = csc_matrix(G, dtype=np.float)
@@ -293,7 +295,12 @@ class Interface():
             Ei[ii] = 1 / len(imgs)
         # Compute pagerank r until we converge
         ro, r = np.zeros(n), np.ones(n)
-        while np.sum(np.abs(r - ro)) > maxerr:
+        #while np.sum(np.abs(r - ro)) > maxerr:
+        for _ in range(100):
+
+            if np.sum(np.abs(r - ro)) <= maxerr:
+                break
+
             ro = r.copy()
             # calculate each pagerank at a time
             for i in range(0, n):
